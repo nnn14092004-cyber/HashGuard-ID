@@ -1,5 +1,6 @@
 # HashGuard-ID: Cryptographic Anti-Toll-Fraud Verification Protocol
 
+[![CI Passing](https://github.com/nnn14092004-cyber/HashGuard-ID/actions/workflows/ci.yml/badge.svg)](https://github.com/nnn14092004-cyber/HashGuard-ID/actions)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Standard: RFC 2289](https://img.shields.io/badge/RFC-2289-green.svg)](https://tools.ietf.org/html/rfc2289)
 [![Standard: RFC 8785](https://img.shields.io/badge/RFC-8785-green.svg)](https://tools.ietf.org/html/rfc8785)
@@ -9,21 +10,21 @@
 
 **HashGuard-ID** is an ultra-low-latency, zero-telecom, one-way cryptographic authentication protocol engineered to permanently eliminate SMS OTP vulnerabilities—specifically **Artificially Inflated Traffic (AIT / SMS Pumping Toll Fraud)**, SIM-swapping, SS7 interception, and Distributed Time-of-Check to Time-of-Use (TOCTOU) race conditions.
 
-By replacing out-of-band telecommunication channels with Lamport one-way reverse hash chains, RFC 5869 HKDF domain separation, RFC 8785 deterministic context enclosure, single-threaded Redis Lua Compare-And-Swap (CAS), and velocity-adaptive Proof-of-Work, HashGuard-ID guarantees a sub-20ms p99 Service Level Agreement (SLA) with **$0.0000 USD** in telecommunication surcharge.
+By replacing out-of-band telecommunication channels with Lamport one-way reverse hash chains, RFC 5869 HKDF domain separation, RFC 8785 deterministic context enclosure, single-threaded Redis Lua Compare-And-Swap (CAS), and velocity-adaptive Proof-of-Work, HashGuard-ID guarantees a sub-20ms p99 Service Level Agreement (SLA) with **$0.0000 USD** in telecommunication surcharges.
 
 ---
 
 ## 1. Problem Space & Attack Economics
 
 ### 1.1 Structural Liabilities of Legacy SMS OTP
-Public Switched Telephone Networks (PSTN) introduce fatal financial and architectural risks:
-* **AIT / SMS Pumping Fraud:** Botnets automate authentication requests against public endpoints targeting premium-rate international ranges colluding with rogue telecom brokers. Enterprises incur $0.05 to $0.15 USD per dispatched SMS, funding multi-million-dollar toll-fraud cartels.
-* **Channel Insecurity & Lack of Context Binding:** Plaintext SMS lacks proof-of-possession and transaction context binding, leaving authentication tokens vulnerable to SS7/Diameter call redirection and SIM-swapping.
-* **NIST SP 800-63B Deprecation:** Section 5.1.3.2 formally deprecates out-of-band SMS delivery for sensitive authentication transactions.
+Public Switched Telephone Networks (PSTN) introduce systemic financial and architectural liabilities for modern identity infrastructure:
+* **AIT / SMS Pumping Fraud:** Botnets automate authentication requests against public endpoints targeting premium-rate international ranges in collusion with rogue telecom brokers. Enterprises incur $0.05 to $0.15 USD per dispatched SMS, funding illicit toll-fraud cartels.
+* **Channel Insecurity & Lack of Context Binding:** Plaintext SMS lacks proof-of-possession and transaction context binding, leaving authentication tokens vulnerable to SS7/Diameter call redirection, IMSI catchers, and SIM-swapping.
+* **NIST SP 800-63B Deprecation:** Section 5.1.3.2 formally deprecates out-of-band SMS delivery for sensitive authentication transactions due to unauthenticated carrier channels.
 
 ### 1.2 Protocol Invariants & Zero-Trust Guarantees
 * **Zero Carrier Cost:** Zero PSTN packets dispatched ($R_{\text{telco}} = \$0.0000$).
-* **Cryptographic Context Enclosure:** Every token is cryptographically bound to an atomic canonical payload (amount, recipient, nonce, timestamp). Token reuse or redirection is mathematically infeasible.
+* **Cryptographic Context Enclosure:** Every token is cryptographically bound to an atomic canonical payload (amount, recipient, nonce, timestamp). Token reuse or cross-transaction injection is computationally infeasible.
 * **Atomic State Monotonicity:** Sequence transitions are strictly monotonic and serialized via atomic Redis Lua CAS, eliminating distributed TOCTOU race conditions.
 * **Asymmetric Anti-Toll Defense:** Edge verification overhead is bounded to $\mathcal{O}(1)$ time and memory, whereas adversarial request floods trigger exponential client CPU exhaustion.
 
@@ -89,79 +90,113 @@ Benchmarked on x86_64 architecture across $500$ consecutive, full-pipeline trans
 
 | Sub-System Metric | p50 (Median) | p95 | p99 | Max |
 | :--- | :--- | :--- | :--- | :--- |
-| **Client PoW Solve ($D = 10\text{ bits}$)** | **1.627 ms** | **2.734 ms** | **3.320 ms** | **4.731 ms** |
-| **Server CAS Core Verification** | **2.446 ms** | **2.801 ms** | **3.288 ms** | **6.723 ms** |
-| **E2E Round-Trip Pipeline Latency** | **6.450 ms** | **7.682 ms** | **9.245 ms** | **13.179 ms** |
+| **Client PoW Solve ($D = 10\text{ bits}$)** | **0.277 ms** | **0.830 ms** | **1.125 ms** | **1.196 ms** |
+| **Server CAS Core Verification** | **2.530 ms** | **3.005 ms** | **3.622 ms** | **7.133 ms** |
+| **E2E Round-Trip Pipeline Latency** | **4.955 ms** | **6.400 ms** | **6.777 ms** | **9.455 ms** |
 
 ### Verified Telemetric Invariants
-* **SLA Compliance Threshold ($< 20.00\text{ ms}$):** **100.0% Compliant** (p99 Margin: $-53.8\%$).
+* **SLA Compliance Threshold ($< 20.00\text{ ms}$):** **100.0% Compliant** (p99 Margin: $-66.1\%$).
 * **Telecommunication Surcharge Dispatched:** **$0.0000 USD** (Zero SMS sent).
 * **Distributed TOCTOU Race Condition Breaches:** **0** (Verified via 50-thread concurrent stress harness).
 * **Socket Memory Cap:** **2,048 octets (2 KB)** strict buffer cap, preventing heap exhaustion.
 
 ---
 
-## 4. Repository Structure
+## 4. Cross-Platform Setup & Verification
 
-```text
-.
-├── Cargo.toml                  # Workspace dependencies and optimization profiles
-├── docker-compose.yml          # Containerized Redis 7.2 state engine configuration
-├── RFC-HashGuard-ID-v1.0.md    # Formal IETF-style protocol specification
-├── demo/
-│   └── index.html              # Real-time WebCrypto cryptographic verification cockpit
-├── crates/
-│   └── hashguard-wasm/         # High-performance Rust WebAssembly Client SDK
-├── scripts/
-│   ├── anchor_cas.lua          # Atomic Redis Lua Compare-And-Swap script
-│   ├── benchmark_sla.py        # Automated 500-transaction SLA percentile benchmark
-│   ├── test_gateway_concurrency.py # 50-thread atomic race condition validation
-│   ├── test_lookahead_recovery.py  # Packet-loss desynchronization & rollover suite
-│   ├── adversarial_simulation.py   # Negative-space attack suite (replay, tampering)
-│   └── generate_readme.py      # Automated documentation generator
-└── src/
-    ├── lib.rs                  # Crate declarations and domain error types
-    ├── chain.rs                # Lamport reverse hash chain implementation
-    ├── context.rs              # RFC 8785 JCS, RFC 5869 HKDF, RFC 2104 HMAC
-    ├── pow.rs                  # Stateless Adaptive Hashcash engine
-    ├── storage.rs              # Asynchronous Redis driver and CAS abstractions
-    └── bin/
-        └── gateway.rs          # Production Axum HTTP Edge Verification Gateway
+HashGuard-ID is fully cross-platform and verified across **Linux (Ubuntu/Debian/RHEL)**, **macOS (Apple Silicon M-Series/Intel)**, and **Windows (Native PowerShell/WSL2)**.
+
+### 4.1 Prerequisites
+* **Rust Toolchain:** `rustc 1.85+` (`rustup update stable`)
+* **Python Runtime:** `python 3.10+`
+* **In-Memory State Store:** Docker / Docker Desktop OR native `redis-server` (7.0+)
+
+### 4.2 Step 1: Launch State Store Engine
+
+```bash
+# Universal (macOS, Linux, Windows with Docker)
+docker compose up -d
+
+# Alternative: Native Redis on Linux/macOS
+# Linux (Ubuntu/Debian): sudo systemctl start redis-server
+# macOS: brew services start redis
+```
+
+### 4.3 Step 2: Build & Start Production Edge Gateway
+
+```bash
+# Linux / macOS (Bash / Zsh)
+cargo run --release --bin gateway
+
+# Windows (PowerShell)
+cargo run --release --bin gateway
+```
+
+The Gateway daemon binds to `http://127.0.0.1:8080` with hardware-accelerated SHA-NI instructions and strict 2 KB socket ingress buffering.
+
+### 4.4 Step 3: Run Universal Verification Suites
+
+All test suites employ standard forward-slash paths compatible across all shells:
+
+```bash
+# 1. Native Rust unit and integration tests (RFC 2289, HKDF, HMAC, JCS)
+cargo test --all -- --nocapture
+
+# 2. 50-Thread atomic race condition audit (0 TOCTOU guarantee)
+python scripts/test_gateway_concurrency.py
+
+# 3. Mobile network packet loss recovery (Delta <= 5) and silent chain rollover
+python scripts/test_lookahead_recovery.py
+
+# 4. Adversarial negative-space attack suite (replay, tampering, preimage forgery)
+python scripts/adversarial_simulation.py
+
+# 5. Full SLA latency distribution benchmark (N = 500 consecutive transactions)
+python scripts/benchmark_sla.py
+```
+
+### 4.5 Step 4: Interactive Client Cockpit Demo
+
+Launch a lightweight local server to test WebCrypto / WebAssembly client operations:
+
+```bash
+# Launch HTTP static daemon
+python -m http.server 3000
+
+# Open in browser:
+# Linux / macOS: open http://localhost:3000/demo/index.html
+# Windows:       start http://localhost:3000/demo/index.html
 ```
 
 ---
 
-## 5. Verification & Test Execution
+## 5. Repository Structure
 
-### 1. Launch Redis State Store
-```bash
-docker compose up -d
-```
-
-### 2. Start Production Edge Gateway
-```bash
-cargo run --bin gateway
-```
-
-### 3. Run Automated Adversarial & Concurrency Test Suites
-```bash
-# Run 50-thread race condition validation (1 commit / 49 reject)
-python .\scripts\test_gateway_concurrency.py
-
-# Run packet loss desync (Delta <= 5) and silent chain rollover verification
-python .\scripts\test_lookahead_recovery.py
-
-# Run adversarial simulation (replay rejection, payload tampering, preimage forgery)
-python .\scripts\adversarial_simulation.py
-
-# Run full SLA latency distribution benchmark (N = 500)
-python .\scripts\benchmark_sla.py
-```
-
-### 4. Launch Interactive Web Cockpit
-```bash
-python -m http.server 3000
-# Open http://localhost:3000/demo/index.html in browser
+```text
+.
+├── Cargo.toml                  # Workspace optimization profiles & dependencies
+├── docker-compose.yml          # Containerized zero-disk Redis 7.2 engine
+├── RFC-HashGuard-ID-v1.0.md    # Formal IETF-style protocol specification
+├── demo/
+│   └── index.html              # Real-time WebCrypto transaction cockpit
+├── crates/
+│   └── hashguard-wasm/         # Client WebAssembly SDK (RFC 2289, HKDF, JCS)
+├── scripts/
+│   ├── anchor_cas.lua          # Atomic Redis Lua Compare-And-Swap script
+│   ├── benchmark_sla.py        # SLA percentile benchmark suite (N = 500)
+│   ├── test_gateway_concurrency.py # 50-thread atomic race condition harness
+│   ├── test_lookahead_recovery.py  # Mobile packet loss & rollover verification
+│   ├── adversarial_simulation.py   # Negative-space attack suite
+│   ├── generate_readme.py      # Automated cross-platform documentation sync
+│   └── write_rfc.py            # RFC specification writer
+└── src/
+    ├── lib.rs                  # Core protocol crate declarations & error types
+    ├── chain.rs                # Lamport reverse hash chain implementation
+    ├── context.rs              # RFC 8785 JCS, RFC 5869 HKDF, RFC 2104 HMAC
+    ├── pow.rs                  # Stateless Adaptive Hashcash engine
+    ├── storage.rs              # Redis async driver & Lua CAS adapter
+    └── bin/
+        └── gateway.rs          # Axum HTTP Edge Verification Gateway
 ```
 
 ---
@@ -171,7 +206,7 @@ python -m http.server 3000
 * **RFC 2104:** HMAC: Keyed-Hashing for Message Authentication.
 * **RFC 5869:** HMAC-based Extract-and-Expand Key Derivation Function (HKDF).
 * **RFC 8785:** JSON Canonicalization Scheme (JCS).
-* **NIST SP 800-63B:** Digital Identity Guidelines (§5.1.3.2 Out-of-Band Verifiers).
+* **NIST SP 800-63B:** Digital Identity Guidelines: Authentication and Lifecycle Management (§5.1.3.2 Out-of-Band Verifiers).
 
 ---
 
