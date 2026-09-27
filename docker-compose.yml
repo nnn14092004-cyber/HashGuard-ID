@@ -1,0 +1,21 @@
+services:
+  redis-core:
+    image: redis:7.2-alpine
+    container_name: hashguard-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: >
+      redis-server
+      --save ""
+      --appendonly no
+      --maxmemory 256mb
+      --maxmemory-policy noeviction
+      --tcp-backlog 511
+      --timeout 0
+      --tcp-keepalive 300
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+    restart: unless-stopped

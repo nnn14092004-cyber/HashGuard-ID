@@ -1,0 +1,25 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# IDE & Editor caches
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python execution caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS specific artifacts
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Environmental variables & runtime state
+.env
+*.log
+dump.rdb

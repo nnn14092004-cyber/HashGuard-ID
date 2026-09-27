@@ -1,0 +1,68 @@
+name: HashGuard-ID Security & Cryptographic Invariants CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  audit-and-verify:
+    name: Cryptographic Verification & Concurrency Harness
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Security Audit & Formatting Check
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets -- -D warnings
+
+      - name: Execute Native Rust Test Suite
+        run: cargo test --all -- --nocapture
+
+      - name: Build Production Edge Gateway
+        run: cargo build --bin gateway --release
+
+      - name: Start Gateway Daemon
+        run: |
+          REDIS_URL="redis://127.0.0.1:6379" target/release/gateway &
+          sleep 2
+
+      - name: Verify Documentation Synchronization
+        run: python scripts/generate_readme.py --check
+
+      - name: Execute Concurrency & TOCTOU Verification (50 Threads)
+        run: python scripts/test_gateway_concurrency.py
+
+      - name: Execute Delta-Lookahead & Silent Rollover Suite
+        run: python scripts/test_lookahead_recovery.py
+
+      - name: Execute Adversarial Negative-Space Attacks
+        run: python scripts/adversarial_simulation.py
+
+      - name: Validate SLA Latency Budget (p99 < 20ms)
+        run: python scripts/benchmark_sla.py

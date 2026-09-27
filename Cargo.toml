@@ -1,0 +1,44 @@
+[package]
+name = "hashguard-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["HashGuard Protocol Team"]
+license = "Apache-2.0"
+
+[dependencies]
+# Cryptographic Primitives (RFC 2289, RFC 2104, RFC 5869)
+sha2 = { version = "0.10.8", default-features = false }
+hmac = { version = "0.12.1", default-features = false }
+hkdf = { version = "0.12.4", default-features = false }
+subtle = { version = "2.5.0", default-features = false }
+getrandom = { version = "0.2.12", features = ["std"] }
+hex = "0.4.3"
+
+# Canonical Serialization (RFC 8785)
+serde = { version = "1.0.197", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0.115", default-features = false, features = ["alloc"] }
+serde_jcs = "0.1.0"
+
+# High-Performance Async Edge Gateway
+axum = { version = "0.7.4", features = ["json"] }
+tower = { version = "0.4.13", features = ["util"] }
+tower-http = { version = "0.5.2", features = ["limit", "trace", "cors"] }
+
+# Distributed Storage & Concurrency (Spec Item 2)
+redis = { version = "0.24.0", features = ["tokio-comp"] }
+tokio = { version = "1.36.0", features = ["full"] }
+
+# Error Handling
+thiserror = "1.0.58"
+
+[profile.test]
+opt-level = 3
+debug = true
+overflow-checks = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
