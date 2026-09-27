@@ -1,4 +1,5 @@
 //! # Distributed Atomic State Store (Redis CAS Engine)
+//! Standards: RFC 2289, RFC 2104, NIST SP 800-63B (§5.1.3.2).
 //! Guarantees: Zero-TOCTOU, O(1) time complexity, strictly monotonic sequence progression.
 
 use crate::HashGuardError;
@@ -37,14 +38,17 @@ impl RedisAnchorStore {
         let anchor_hex = hex::encode(anchor);
 
         let () = con
-            .hset_multiple(&key, &[("anchor", &anchor_hex), ("step", &total_steps.to_string())])
+            .hset_multiple(
+                &key,
+                &[("anchor", &anchor_hex), ("step", &total_steps.to_string())],
+            )
             .await
             .map_err(|_| HashGuardError::EntropyFailure)?;
 
         Ok(())
     }
 
-    /// Executes atomic CAS verification and advance.
+    /// Executes atomic CAS verification and sequence advance.
     /// Time Complexity: O(1)
     /// Space Complexity: O(1)
     pub async fn atomic_verify_and_advance<C>(
@@ -95,5 +99,11 @@ impl RedisAnchorStore {
                 }
             }
         }
+    }
+}
+
+impl Default for RedisAnchorStore {
+    fn default() -> Self {
+        Self::new()
     }
 }
