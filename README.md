@@ -41,7 +41,7 @@ Public Switched Telephone Networks (PSTN) introduce systemic financial and archi
 │    [Client solves Adaptive Hashcash: O(2^D) iterations]                │
 │    [Client advances Lamport Chain: Token T_k = H^k(S)]                 │
 │    [RFC 5869 Key Derivation: K_context = HKDF-Expand(T_k)]             │
-│    [RFC 8785 JCS Canonicalization -> RFC 2104 HMAC Signature]         │
+│    [RFC 8785 JCS Canonicalization -> RFC 2104 HMAC Signature]          │
 │                                                                        │
 │─── 3. POST /v1/verify (Envelope, PoW Nonce, Token T_k, Signature) ────►│
 │                                                                        │
