@@ -22,15 +22,12 @@ GATEWAY_PORT = 8080
 GATEWAY_URL = f"http://{GATEWAY_HOST}:{GATEWAY_PORT}"
 HKDF_CONTEXT_INFO = b"HashGuard-v1-Context-Enclosure-Key"
 
-
 def sha256(data: bytes) -> bytes:
     return hashlib.sha256(data).digest()
-
 
 def hkdf_derive_context_key(ikm: bytes) -> bytes:
     prk = hmac.new(b"\x00" * 32, ikm, hashlib.sha256).digest()
     return hmac.new(prk, HKDF_CONTEXT_INFO + b"\x01", hashlib.sha256).digest()[:32]
-
 
 def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
     mask = 0 if difficulty == 0 else ((1 << 32) - 1) ^ ((1 << (32 - difficulty)) - 1)
@@ -45,7 +42,6 @@ def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
         if (prefix & mask) == 0:
             return nonce
         nonce += 1
-
 
 def post_json_persistent(
     conn: http.client.HTTPConnection, endpoint: str, payload: Dict[str, Any]
@@ -70,10 +66,7 @@ def post_json_persistent(
         parsed = {"raw": raw, "error": raw}
     return resp.status, parsed
 
-
-# ==============================================================================
 # REALISTIC VECTOR 1: CELLULAR 4G/5G JITTER & PACKET LOSS RECOVERY
-# ==============================================================================
 def test_realistic_cellular_jitter_and_loss() -> None:
     print("\n[REALISTIC VECTOR 1] Simulating 4G/5G Cellular Radio Conditions (Jitter & Packet Loss)...")
     user_id = f"usr_wan_jitter_{time.time_ns()}"
@@ -142,10 +135,7 @@ def test_realistic_cellular_jitter_and_loss() -> None:
     conn.close()
     print(f"    [+] PASS: {tx_count} transactions committed. Recovered from {recovered_desyncs} packet-loss desync hops.")
 
-
-# ==============================================================================
 # REALISTIC VECTOR 2: OUT-OF-ORDER PACKET ARRIVAL UNDER ASYMMETRIC ROUTING
-# ==============================================================================
 def test_realistic_out_of_order_arrival() -> None:
     print("\n[REALISTIC VECTOR 2] Testing Out-of-Order Packet Delivery (Asymmetric Multi-Path Routing)...")
     user_id = f"usr_wan_ooo_{time.time_ns()}"
@@ -228,10 +218,7 @@ def test_realistic_out_of_order_arrival() -> None:
     print("    [+] PASS: Stale delayed packet (step 9 >= 8) strictly rejected with ERR_SEQUENCE_VIOLATION.")
     conn.close()
 
-
-# ==============================================================================
 # REALISTIC VECTOR 3: HTTP KEEP-ALIVE SOCKET ENDURANCE TEST (N = 1,000)
-# ==============================================================================
 def test_realistic_socket_endurance_pool() -> None:
     print("\n[REALISTIC VECTOR 3] Auditing TCP Socket Pool Endurance (N = 1,000 Persistent Requests)...")
 
@@ -252,7 +239,6 @@ def test_realistic_socket_endurance_pool() -> None:
     print(f"    [+] Completed {n_requests:,} persistent calls in {elapsed:.3f}s ({throughput:.1f} req/sec).")
     print("    [+] PASS: Zero socket leakage, no TIME_WAIT exhaustion detected across keep-alive connections.")
 
-
 def main() -> None:
     print("===================================================================")
     print("STARTING HASHGUARD-ID REALISTIC COMMERCIAL WAN SUITE")
@@ -267,7 +253,6 @@ def main() -> None:
     print("\n===================================================================")
     print("[SUCCESS] ALL REALISTIC PRODUCTION AUDITS COMPLETED (100% COMPLIANT)")
     print("===================================================================")
-
 
 if __name__ == "__main__":
     main()

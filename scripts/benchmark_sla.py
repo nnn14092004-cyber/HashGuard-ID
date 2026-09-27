@@ -22,15 +22,12 @@ HKDF_CONTEXT_INFO: bytes = b"HashGuard-v1-Context-Enclosure-Key"
 BENCHMARK_USER_ID: str = "usr_benchmark_perf"
 NUM_ITERATIONS: int = 500
 
-
 def sha256(data: bytes) -> bytes:
     return hashlib.sha256(data).digest()
-
 
 def hkdf_extract_and_expand(ikm: bytes, info: bytes = HKDF_CONTEXT_INFO, length: int = 32) -> bytes:
     prk = hmac.new(b"\x00" * 32, ikm, hashlib.sha256).digest()
     return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()[:length]
-
 
 def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
     mask = 0 if difficulty == 0 else ((1 << 32) - 1) ^ ((1 << (32 - difficulty)) - 1)
@@ -46,7 +43,6 @@ def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
             return nonce
         nonce += 1
 
-
 def post_json(endpoint: str, payload: Dict[str, Any]) -> Tuple[int, Any]:
     req = urllib.request.Request(
         f"{GATEWAY_URL}{endpoint}",
@@ -55,7 +51,6 @@ def post_json(endpoint: str, payload: Dict[str, Any]) -> Tuple[int, Any]:
     )
     with urllib.request.urlopen(req) as resp:
         return resp.status, json.loads(resp.read().decode("utf-8"))
-
 
 def calculate_percentiles(latencies: List[float]) -> Dict[str, float]:
     latencies.sort()
@@ -67,7 +62,6 @@ def calculate_percentiles(latencies: List[float]) -> Dict[str, float]:
         "p99": latencies[int(n * 0.99)],
         "max": latencies[-1],
     }
-
 
 def main() -> None:
     print("===================================================================")
@@ -159,7 +153,6 @@ def main() -> None:
     print(f"[+] SLA Target (< 20.00 ms)   : {'100% COMPLIANT' if e2e_stats['p99'] < 20.0 else 'VIOLATED'}")
     print(f"[+] Carrier Telecom Surcharge : $0.0000 USD (0 SMS Dispatched)")
     print("===================================================================")
-
 
 if __name__ == "__main__":
     main()

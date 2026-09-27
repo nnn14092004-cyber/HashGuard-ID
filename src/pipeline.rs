@@ -49,9 +49,7 @@ impl ProtocolPipeline {
     ) -> Result<PipelineTelemetry, HashGuardError> {
         let pipeline_start = std::time::Instant::now();
 
-        // -------------------------------------------------------------
         // STEP 1: Verify Stateless PoW Challenge Ticket & Proof (Spec Item 3)
-        // -------------------------------------------------------------
         let pow_start = std::time::Instant::now();
 
         // 1.1 Verify ticket integrity and freshness in O(1)
@@ -71,18 +69,14 @@ impl ProtocolPipeline {
         }
         let pow_verification_nanos = pow_start.elapsed().as_nanos();
 
-        // -------------------------------------------------------------
         // STEP 2: Verify Cryptographic Context Binding (Spec Item 1)
-        // -------------------------------------------------------------
         let context_start = std::time::Instant::now();
 
         // 2.1 Constant-time HMAC transaction envelope verification
         request.envelope.verify_binding()?;
         let context_verification_nanos = context_start.elapsed().as_nanos();
 
-        // -------------------------------------------------------------
         // STEP 3: Verify Reverse Hash Chain Preimage & Monotonicity (Spec Items 1 & 2)
-        // -------------------------------------------------------------
         // 3.1 Strict sequence monotonicity check
         if request.envelope.step_index >= *current_step {
             return Err(HashGuardError::SequenceViolation);

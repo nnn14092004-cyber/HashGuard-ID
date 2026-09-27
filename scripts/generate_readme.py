@@ -166,10 +166,8 @@ This protocol and reference implementation are licensed under the **Apache-2.0 L
 
 README_CONTENT = README_RAW.replace("__BT__", BT)
 
-
 def get_default_readme_path() -> Path:
     return Path(__file__).resolve().parent.parent / "README.md"
-
 
 def generate_readme(output_path: Path | None = None) -> Path:
     target = output_path or get_default_readme_path()
@@ -177,14 +175,12 @@ def generate_readme(output_path: Path | None = None) -> Path:
     target.write_text(README_CONTENT.strip() + "\n", encoding="utf-8")
     return target
 
-
 def verify_readme(target_path: Path) -> bool:
     if not target_path.exists():
         return False
     current_content = target_path.read_text(encoding="utf-8")
     expected_content = README_CONTENT.strip() + "\n"
     return current_content == expected_content
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -218,7 +214,6 @@ def main() -> int:
     file_size = written_path.stat().st_size
     print(f"[SUCCESS] Generated {written_path} ({file_size:,} bytes, Cross-Platform UTF-8 Clean).")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

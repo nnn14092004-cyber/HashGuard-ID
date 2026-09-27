@@ -4,20 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HashGuard-ID | Zero-Telecom Authentication Cockpit</title>
+    <title>HashGuard-ID Verification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg: #090d16;
-            --card-bg: #111726;
+            --surface: #111726;
+            --surface-code: #030712;
             --border: #1e293b;
             --accent: #0ea5e9;
             --accent-hover: #0284c7;
+            --text: #f8fafc;
+            --muted: #94a3b8;
             --green: #10b981;
-            --red: #ef4444;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --code-bg: #030712;
-            --mono: "JetBrains Mono", "Fira Code", monospace;
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Inter', system-ui, sans-serif;
         }
 
         * {
@@ -28,16 +33,16 @@
 
         body {
             background: var(--bg);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 24px;
+            color: var(--text);
+            font-family: var(--sans);
+            padding: 32px 20px;
             display: flex;
             justify-content: center;
         }
 
         .container {
             width: 100%;
-            max-width: 1200px;
+            max-width: 1100px;
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -51,55 +56,79 @@
             border-bottom: 1px solid var(--border);
         }
 
+        .badge-group {
+            display: flex;
+            gap: 8px;
+        }
+
         .badge {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 500;
             padding: 4px 10px;
-            border-radius: 9999px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            color: var(--muted);
         }
 
-        .badge-telecom {
-            background: rgba(16, 185, 129, 0.1);
+        .badge-active {
             color: var(--green);
-            border: 1px solid var(--green);
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.05);
         }
 
-        .badge-status {
-            background: rgba(14, 165, 233, 0.1);
-            color: var(--accent);
-            border: 1px solid var(--accent);
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
         }
 
-        .grid {
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-family: var(--mono);
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .workspace {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
         }
 
-        .card {
-            background: var(--card-bg);
+        .panel {
+            background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 6px;
             padding: 20px;
             display: flex;
             flex-direction: column;
             gap: 14px;
         }
 
-        .card-title {
-            font-size: 14px;
-            font-weight: 700;
+        .panel-heading {
+            font-size: 12px;
+            font-weight: 600;
             color: var(--accent);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            letter-spacing: 0.05em;
         }
 
-        .form-group {
+        .field {
             display: flex;
             flex-direction: column;
             gap: 6px;
@@ -107,20 +136,18 @@
 
         label {
             font-size: 12px;
-            color: var(--text-muted);
-            font-weight: 500;
+            color: var(--muted);
         }
 
         input,
-        textarea,
-        select {
-            background: var(--code-bg);
+        textarea {
+            background: var(--surface-code);
             border: 1px solid var(--border);
             border-radius: 4px;
-            color: var(--text-main);
+            color: var(--text);
             padding: 10px;
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 12px;
         }
 
         input:focus,
@@ -129,73 +156,43 @@
             border-color: var(--accent);
         }
 
+        input[readonly] {
+            color: var(--muted);
+            cursor: not-allowed;
+        }
+
         button {
             background: var(--accent);
             color: #fff;
             border: none;
             border-radius: 4px;
-            padding: 12px;
-            font-weight: 600;
+            padding: 11px;
+            font-size: 13px;
+            font-weight: 500;
             cursor: pointer;
-            transition: background 0.15s;
+            transition: opacity 0.15s;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background: var(--accent-hover);
         }
 
         button:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
 
-        .btn-secondary {
-            background: #1e293b;
-            color: var(--text-main);
-        }
-
-        .btn-secondary:hover {
-            background: #334155;
-        }
-
-        .metrics {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-        }
-
-        .metric-card {
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px;
-            text-align: center;
-        }
-
-        .metric-val {
-            font-size: 20px;
-            font-weight: 700;
-            font-family: var(--mono);
-            color: var(--text-main);
-            margin-top: 4px;
-        }
-
-        .metric-label {
-            font-size: 11px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-
         pre {
-            background: var(--code-bg);
+            background: var(--surface-code);
             border: 1px solid var(--border);
             border-radius: 4px;
             padding: 12px;
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 11px;
             color: #38bdf8;
             overflow-x: auto;
-            max-height: 250px;
+            max-height: 220px;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -204,264 +201,247 @@
     <div class="container">
         <header>
             <div>
-                <h1 style="font-size: 20px; font-weight: 700;">HashGuard-ID Verification Cockpit</h1>
-                <p style="font-size: 12px; color: var(--text-muted);">Cryptographic Anti-Toll-Fraud Protocol (RFC 2289,
-                    5869, 2104, 8785)</p>
+                <h1 style="font-size: 18px; font-weight: 600;">HashGuard-ID Verification Console</h1>
+                <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+                    RFC 2289, RFC 2104, RFC 5869, RFC 8785 | NIST SP 800-63B (§5.1.3.2)
+                </p>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <span class="badge badge-telecom">Carrier Surcharge: $0.00 (0 SMS)</span>
-                <span class="badge badge-status" id="engineBadge">Engine: WebCrypto Native</span>
+            <div class="badge-group">
+                <span class="badge badge-active">Surcharge: $0.0000 USD</span>
+                <span class="badge">WebCrypto Native</span>
             </div>
         </header>
 
-        <div class="metrics">
-            <div class="metric-card">
-                <div class="metric-label">Current Step Index</div>
-                <div class="metric-val" id="metricStep">--</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Chain Depth (k)</div>
+                <div class="stat-value" id="valStep">--</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-label">Client PoW Duration</div>
-                <div class="metric-val" id="metricClientSolve">-- ms</div>
+            <div class="stat-card">
+                <div class="stat-label">Client PoW (D=10)</div>
+                <div class="stat-value" id="valClientSolve">-- ms</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-label">Server Core Latency</div>
-                <div class="metric-val" id="metricServerLatency">-- µs</div>
+            <div class="stat-card">
+                <div class="stat-label">Server CAS Execution</div>
+                <div class="stat-value" id="valServerLatency">-- µs</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-label">SLA Compliance (< 20ms)</div>
-                        <div class="metric-val" style="color: var(--green);" id="metricSla">100%</div>
+            <div class="stat-card">
+                <div class="stat-label">SLA (< 20ms)</div>
+                        <div class="stat-value" style="color: var(--green);" id="valSla">100%</div>
                 </div>
             </div>
 
-            <div class="grid">
-                <!-- CLIENT SIDE -->
-                <div class="card">
-                    <div class="card-title">1. Client Reverse Chain & Provisioning</div>
-                    <div class="form-group">
-                        <label>Subject Identity (User ID)</label>
-                        <input type="text" id="userId" value="usr_alice_demo">
+            <div class="workspace">
+                <div class="panel">
+                    <div class="panel-heading">1. Client Lamport Provisioning</div>
+                    <div class="field">
+                        <label>Identity Subject</label>
+                        <input type="text" id="userId" value="usr_alice_demo" spellcheck="false">
                     </div>
-                    <div class="form-group">
-                        <label>Chain Length (N)</label>
-                        <input type="number" id="chainLength" value="50">
+                    <div class="field">
+                        <label>Total Chain Steps (N)</label>
+                        <input type="number" id="chainDepth" value="100" min="10" max="1000">
                     </div>
-                    <button id="btnEnroll">Initialize & Enroll Terminal Anchor</button>
-                    <div class="form-group">
+                    <button id="btnEnroll">Initialize & Enroll Anchor</button>
+                    <div class="field">
                         <label>Terminal Anchor H^N(S)</label>
-                        <input type="text" id="terminalAnchorDisplay" readonly placeholder="Not initialized">
+                        <input type="text" id="anchorDisplay" readonly placeholder="Uninitialized" spellcheck="false">
                     </div>
 
-                    <hr style="border: 0; border-top: 1px solid var(--border); margin: 6px 0;">
-
-                    <div class="card-title">2. Atomic Transaction Submission</div>
-                    <div class="form-group">
-                        <label>Transaction Payload (RFC 8785 Canonical JCS Target)</label>
-                        <textarea id="txPayload" rows="5">{
-  "amount": 250000,
-  "currency": "VND",
-  "recipient": "safe_merchant_store",
-  "tx_id": "tx_prod_99182"
+                    <div class="panel-heading" style="margin-top: 10px;">2. Transaction Execution</div>
+                    <div class="field">
+                        <label>Transaction Payload (RFC 8785 Target)</label>
+                        <textarea id="txPayload" rows="6" spellcheck="false">{
+  "amount_cents": 25000,
+  "currency": "USD",
+  "recipient": "stripe_merchant_global",
+  "tx_id": "tx_us_8849201"
 }</textarea>
                     </div>
-                    <button id="btnExecuteTx" disabled>Execute 0-SMS Transaction</button>
+                    <button id="btnSubmitTx" disabled>Authorize 0-SMS Transaction</button>
                 </div>
 
-                <!-- SERVER & TELEMETRY -->
-                <div class="card">
-                    <div class="card-title">Protocol Telemetry & Envelope Stream</div>
-                    <div class="form-group">
-                        <label>Last Verified Envelope Payload</label>
-                        <pre id="streamEnvelope">// Awaiting transaction execution...</pre>
+                <div class="panel">
+                    <div class="panel-heading">Telemetry & Envelope Logs</div>
+                    <div class="field">
+                        <label>Outbound Cryptographic Envelope</label>
+                        <pre id="logEnvelope">// Ready</pre>
                     </div>
-                    <div class="form-group">
-                        <label>Gateway CAS Verification Response</label>
-                        <pre id="streamResponse">// Status idle</pre>
+                    <div class="field">
+                        <label>Inbound Gateway CAS Response</label>
+                        <pre id="logResponse">// Idle</pre>
                     </div>
                 </div>
             </div>
         </div>
 
         <script>
-            const GATEWAY = "http://127.0.0.1:8080";
+            const GATEWAY_URL = "http://127.0.0.1:8080";
             const HKDF_INFO = new TextEncoder().encode("HashGuard-v1-Context-Enclosure-Key");
 
-            let chainState = {
+            const clientState = {
                 tokens: [],
                 currentIndex: 0,
                 userId: ""
             };
 
-            // --- CRYPTOGRAPHIC PRIMITIVES (RFC 2289, 5869, 2104) ---
-            async function sha256(buffer) {
-                return new Uint8Array(await crypto.subtle.digest("SHA-256", buffer));
+            async function sha256(data) {
+                const digest = await crypto.subtle.digest("SHA-256", data);
+                return new Uint8Array(digest);
             }
 
             function toHex(buf) {
                 return Array.from(buf).map(b => b.toString(16).padStart(2, "0")).join("");
             }
 
-            function fromHex(hexStr) {
-                const match = hexStr.match(/.{1,2}/g);
-                return new Uint8Array(match ? match.map(byte => parseInt(byte, 16)) : []);
+            function fromHex(hex) {
+                const clean = hex.trim();
+                const matches = clean.match(/.{1,2}/g);
+                return new Uint8Array(matches ? matches.map(b => parseInt(b, 16)) : []);
             }
 
-            // Hashcash Solver sửa chuẩn toán tử 32-bit: kiểm tra chính xác D bit cao nhất
-            async function solveHashcash(ticketHmacBytes, difficulty) {
-                // Dịch chuyển bit an toàn cho không gian 32-bit
-                const mask = difficulty === 0
-                    ? 0
-                    : ((0xFFFFFFFF >>> (32 - difficulty)) << (32 - difficulty)) >>> 0;
-
+            async function solvePoW(ticketHmacBytes, difficulty) {
+                const mask = difficulty === 0 ? 0 : ((0xFFFFFFFF >>> (32 - difficulty)) << (32 - difficulty)) >>> 0;
                 let nonce = 0;
-                const buf = new Uint8Array(40);
-                buf.set(ticketHmacBytes, 0);
+                const buffer = new Uint8Array(40);
+                buffer.set(ticketHmacBytes, 0);
+                const view = new DataView(buffer.buffer);
 
                 while (true) {
-                    const view = new DataView(buf.buffer);
-                    view.setBigUint64(32, BigInt(nonce), false); // Big-Endian 64-bit uint
-                    const digest = await crypto.subtle.digest("SHA-256", buf);
+                    view.setBigUint64(32, BigInt(nonce), false);
+                    const digest = await crypto.subtle.digest("SHA-256", buffer);
                     const prefix = new DataView(digest).getUint32(0, false);
-
-                    if ((prefix & mask) === 0) {
-                        return nonce;
-                    }
+                    if ((prefix & mask) === 0) return nonce;
                     nonce++;
                 }
             }
 
-            async function hkdfExtractAndExpand(ikmBytes) {
-                const salt = new Uint8Array(32); // Salt mặc định 32 byte 0x00
+            async function deriveContextKey(tokenBytes) {
+                const salt = new Uint8Array(32);
                 const saltKey = await crypto.subtle.importKey("raw", salt, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-                const prk = new Uint8Array(await crypto.subtle.sign("HMAC", saltKey, ikmBytes));
+                const prk = await crypto.subtle.sign("HMAC", saltKey, tokenBytes);
 
                 const prkKey = await crypto.subtle.importKey("raw", prk, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-                const expandBuffer = new Uint8Array(HKDF_INFO.length + 1);
-                expandBuffer.set(HKDF_INFO, 0);
-                expandBuffer[HKDF_INFO.length] = 0x01; // Block 1
+                const expBuffer = new Uint8Array(HKDF_INFO.length + 1);
+                expBuffer.set(HKDF_INFO, 0);
+                expBuffer[HKDF_INFO.length] = 0x01;
 
-                return new Uint8Array(await crypto.subtle.sign("HMAC", prkKey, expandBuffer));
+                const okm = await crypto.subtle.sign("HMAC", prkKey, expBuffer);
+                return new Uint8Array(okm);
             }
 
-            async function signPayload(derivedKeyBytes, payloadObj) {
-                // Sắp xếp khóa cấp 1 phục vụ chuẩn hóa JCS
-                const sortedKeys = Object.keys(payloadObj).sort();
-                const canonicalObj = {};
-                for (const k of sortedKeys) canonicalObj[k] = payloadObj[k];
-                const canonicalStr = JSON.stringify(canonicalObj);
+            async function signCanonicalPayload(keyBytes, payload) {
+                const sortedKeys = Object.keys(payload).sort();
+                const canonicalMap = {};
+                for (const k of sortedKeys) canonicalMap[k] = payload[k];
 
-                const payloadDigest = await sha256(new TextEncoder().encode(canonicalStr));
-                const key = await crypto.subtle.importKey("raw", derivedKeyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-                return new Uint8Array(await crypto.subtle.sign("HMAC", key, payloadDigest));
+                const canonicalBytes = new TextEncoder().encode(JSON.stringify(canonicalMap));
+                const digest = await sha256(canonicalBytes);
+
+                const hmacKey = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+                const signature = await crypto.subtle.sign("HMAC", hmacKey, digest);
+                return new Uint8Array(signature);
             }
 
-            // --- WORKFLOW HANDLERS ---
             document.getElementById("btnEnroll").addEventListener("click", async () => {
                 const userId = document.getElementById("userId").value.trim();
-                const N = parseInt(document.getElementById("chainLength").value, 10);
-                if (!userId || isNaN(N) || N < 1) return alert("Provide valid User ID and N");
+                const N = parseInt(document.getElementById("chainDepth").value, 10);
+                if (!userId || isNaN(N) || N < 1) return alert("Invalid ID or chain depth.");
 
                 const seed = new Uint8Array(32);
                 crypto.getRandomValues(seed);
-                const tokens = [seed];
+                const chain = [seed];
 
                 for (let i = 0; i < N; i++) {
-                    tokens.push(await sha256(tokens[i]));
+                    chain.push(await sha256(chain[i]));
                 }
 
-                chainState.tokens = tokens;
-                chainState.currentIndex = N;
-                chainState.userId = userId;
+                clientState.tokens = chain;
+                clientState.currentIndex = N;
+                clientState.userId = userId;
 
-                const terminalAnchor = toHex(tokens[N]);
-                document.getElementById("terminalAnchorDisplay").value = terminalAnchor;
+                const terminalAnchor = toHex(chain[N]);
+                document.getElementById("anchorDisplay").value = terminalAnchor;
 
                 try {
-                    const resp = await fetch(`${GATEWAY}/v1/enroll`, {
+                    const res = await fetch(`${GATEWAY_URL}/v1/enroll`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ user_id: userId, terminal_anchor: terminalAnchor, total_steps: N })
                     });
 
-                    const rawText = await resp.text();
-                    if (resp.ok) {
-                        const resData = JSON.parse(rawText);
-                        document.getElementById("btnExecuteTx").disabled = false;
-                        document.getElementById("metricStep").textContent = N;
-                        document.getElementById("streamResponse").textContent = JSON.stringify(resData, null, 2);
-                    } else {
-                        alert(`Gateway enrollment failed: ${rawText}`);
-                    }
+                    const body = await res.text();
+                    if (!res.ok) throw new Error(body);
+
+                    document.getElementById("btnSubmitTx").disabled = false;
+                    document.getElementById("valStep").textContent = N;
+                    document.getElementById("logResponse").textContent = JSON.stringify(JSON.parse(body), null, 2);
                 } catch (err) {
-                    alert(`Cannot connect to Gateway: ${err.message}`);
+                    alert(`Enrollment failed: ${err.message}`);
                 }
             });
 
-            document.getElementById("btnExecuteTx").addEventListener("click", async () => {
-                if (chainState.currentIndex === 0) return alert("Chain exhausted (k=0).");
+            document.getElementById("btnSubmitTx").addEventListener("click", async () => {
+                if (clientState.currentIndex === 0) return alert("Chain exhausted (k=0). Re-enrollment required.");
 
-                const tClientStart = performance.now();
+                const startSolve = performance.now();
 
                 try {
-                    // 1. Xin vé Challenge phi trạng thái
-                    const chalResp = await fetch(`${GATEWAY}/v1/challenge`, {
+                    const chalRes = await fetch(`${GATEWAY_URL}/v1/challenge`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ client_ip: "127.0.0.1", velocity_rpm: 1 })
                     });
-                    if (!chalResp.ok) throw new Error(await chalResp.text());
-                    const chal = await chalResp.json();
+                    if (!chalRes.ok) throw new Error(await chalRes.text());
+                    const chal = await chalRes.json();
 
-                    // 2. Giải Hashcash với mask 10-bit đã chuẩn hóa
-                    const ticketBytes = fromHex(chal.ticket_hmac);
-                    const nonce = await solveHashcash(ticketBytes, chal.difficulty_bits);
-                    const clientSolveMs = performance.now() - tClientStart;
+                    const powNonce = await solvePoW(fromHex(chal.ticket_hmac), chal.difficulty_bits);
+                    const solveDurationMs = performance.now() - startSolve;
 
-                    // 3. Tiến một bước trên chuỗi Lamport và ký HMAC ngữ cảnh
-                    const stepIndex = chainState.currentIndex - 1;
-                    const token = chainState.tokens[stepIndex];
-                    const payloadObj = JSON.parse(document.getElementById("txPayload").value);
+                    const stepIndex = clientState.currentIndex - 1;
+                    const token = clientState.tokens[stepIndex];
+                    const payload = JSON.parse(document.getElementById("txPayload").value);
 
-                    const derivedKey = await hkdfExtractAndExpand(token);
-                    const signature = await signPayload(derivedKey, payloadObj);
+                    const signingKey = await deriveContextKey(token);
+                    const signature = await signCanonicalPayload(signingKey, payload);
 
                     const envelope = {
-                        user_id: chainState.userId,
+                        user_id: clientState.userId,
                         client_ip: chal.client_ip,
                         timestamp: chal.timestamp,
                         difficulty_bits: chal.difficulty_bits,
                         ticket_hmac: chal.ticket_hmac,
-                        pow_nonce: nonce,
+                        pow_nonce: powNonce,
                         step_index: stepIndex,
                         token: toHex(token),
                         signature: toHex(signature),
-                        nonce: `web_${Date.now()}`,
-                        canonical_payload: payloadObj
+                        nonce: `tx_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+                        canonical_payload: payload
                     };
 
-                    document.getElementById("streamEnvelope").textContent = JSON.stringify(envelope, null, 2);
+                    document.getElementById("logEnvelope").textContent = JSON.stringify(envelope, null, 2);
 
-                    // 4. Gửi lên Redis Lua CAS Gateway xác thực nguyên tử
-                    const verifyResp = await fetch(`${GATEWAY}/v1/verify`, {
+                    const verifyRes = await fetch(`${GATEWAY_URL}/v1/verify`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(envelope)
                     });
 
-                    const rawText = await verifyResp.text();
-                    if (verifyResp.ok) {
-                        const verifyData = JSON.parse(rawText);
-                        document.getElementById("streamResponse").textContent = JSON.stringify(verifyData, null, 2);
+                    const rawBody = await verifyRes.text();
+                    if (!verifyRes.ok) throw new Error(`HTTP ${verifyRes.status}: ${rawBody}`);
 
-                        chainState.currentIndex = stepIndex;
-                        document.getElementById("metricStep").textContent = verifyData.remaining_step;
-                        document.getElementById("metricClientSolve").textContent = `${clientSolveMs.toFixed(2)} ms`;
-                        document.getElementById("metricServerLatency").textContent = `${verifyData.server_execution_micros.toFixed(1)} µs`;
-                    } else {
-                        document.getElementById("streamResponse").textContent = `HTTP ${verifyResp.status}: ${rawText}`;
-                        alert(`Verification rejected [HTTP ${verifyResp.status}]: ${rawText}`);
-                    }
+                    const verifyData = JSON.parse(rawBody);
+                    document.getElementById("logResponse").textContent = JSON.stringify(verifyData, null, 2);
+
+                    clientState.currentIndex = stepIndex;
+                    document.getElementById("valStep").textContent = verifyData.remaining_step;
+                    document.getElementById("valClientSolve").textContent = `${solveDurationMs.toFixed(2)} ms`;
+                    document.getElementById("valServerLatency").textContent = `${verifyData.server_execution_micros.toFixed(1)} µs`;
                 } catch (err) {
-                    alert(`Transaction failure: ${err.message}`);
+                    alert(`Transaction error: ${err.message}`);
                 }
             });
         </script>
+</body>
+
+</html>

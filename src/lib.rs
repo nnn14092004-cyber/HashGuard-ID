@@ -1,9 +1,7 @@
-//! # HashGuard-ID Core Verification Protocol
-//! Specifications: RFC 2289, RFC 2104, RFC 5869, RFC 8785, NIST SP 800-63B.
-//! Guarantees: Constant-time execution, strictly O(1) state verification, zero-telecom dependency.
-
-#![deny(unsafe_code)]
-#![allow(missing_docs)]
+//! # HashGuard-ID Core Cryptographic Protocol Library
+//! Standards   : RFC 2289, RFC 2104, RFC 5869, RFC 8785, NIST SP 800-63B (§5.1.3.2)
+//! Guarantees  : Zero-Telecom Surcharge ($0.0000 USD), Anti-AIT Toll Fraud Mitigation,
+//!               Hardware-Accelerated Lamport CAS Engine, Constant-Time Side-Channel Immunity.
 
 pub mod chain;
 pub mod context;
@@ -11,41 +9,51 @@ pub mod pipeline;
 pub mod pow;
 pub mod storage;
 
-pub use chain::{ClientChain, ServerAnchor};
-pub use context::{CanonicalTransaction, TransactionEnvelope};
-pub use pipeline::{PipelineTelemetry, ProtocolPipeline, VerificationRequest};
-pub use pow::{ChallengeTicket, HashcashEngine};
-pub use storage::RedisAnchorStore;
+use std::fmt;
 
-use thiserror::Error;
-
-/// Protocol failure states.
-#[derive(Error, Debug, PartialEq, Eq)]
+/// Unified cryptographic, protocol, and state-machine error enumeration.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HashGuardError {
-    #[error("Cryptographic preimage mismatch: H(T_k) != CurrentAnchor")]
-    InvalidPreimage,
-
-    #[error("Context signature mismatch: Constant-time HMAC comparison failed")]
-    InvalidContextSignature,
-
-    #[error("RFC 8785 canonical serialization failure")]
-    SerializationError,
-
-    #[error("Lamport chain exhausted: Current index reached zero")]
-    ChainExhausted,
-
-    #[error("Monotonic sequence violation or replay attempt")]
-    SequenceViolation,
-
-    #[error("Internal operational failure or entropy depletion")]
     EntropyFailure,
-
-    #[error("Challenge ticket expired: TTL window exceeded")]
+    ChainExhausted,
+    SequenceViolation,
+    InvalidPreimage,
+    LookaheadExceeded,
+    ReplayAttack,
+    StateNotFound,
+    DistributedLockError(String),
+    SerializationError,
+    InvalidContextSignature,
     ChallengeExpired,
-
-    #[error("Invalid challenge ticket signature")]
     InvalidChallenge,
-
-    #[error("Proof-of-work difficulty requirement not satisfied")]
     InvalidProofOfWork,
 }
+
+impl fmt::Display for HashGuardError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EntropyFailure => write!(f, "CRYPTOGRAPHIC_ENTROPY_FAILURE"),
+            Self::ChainExhausted => write!(f, "ERR_CHAIN_EXHAUSTED"),
+            Self::SequenceViolation => write!(f, "ERR_SEQUENCE_VIOLATION"),
+            Self::InvalidPreimage => write!(f, "ERR_PREIMAGE_MISMATCH"),
+            Self::LookaheadExceeded => write!(f, "ERR_LOOKAHEAD_EXCEEDED"),
+            Self::ReplayAttack => write!(f, "ERR_NONCE_REPLAY"),
+            Self::StateNotFound => write!(f, "ERR_USER_NOT_FOUND"),
+            Self::DistributedLockError(msg) => write!(f, "ERR_DISTRIBUTED_STATE_FAILURE: {}", msg),
+            Self::SerializationError => write!(f, "ERR_CANONICALIZATION_FAILED"),
+            Self::InvalidContextSignature => write!(f, "ERR_INVALID_CONTEXT_SIGNATURE"),
+            Self::ChallengeExpired => write!(f, "ERR_CHALLENGE_EXPIRED"),
+            Self::InvalidChallenge => write!(f, "ERR_INVALID_CHALLENGE"),
+            Self::InvalidProofOfWork => write!(f, "ERR_INVALID_PROOF_OF_WORK"),
+        }
+    }
+}
+
+impl std::error::Error for HashGuardError {}
+
+// Re-export core primitives for downstream integration tests
+pub use chain::{ClientChain, ServerAnchor};
+pub use context::{CanonicalTransaction, TransactionEnvelope};
+pub use pipeline::{ProtocolPipeline, VerificationRequest};
+pub use pow::{ChallengeTicket, HashcashEngine};
+pub use storage::RedisAnchorStore;

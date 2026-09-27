@@ -22,15 +22,12 @@ from typing import Any, Dict, List, Tuple
 GATEWAY_URL: str = "http://127.0.0.1:8080"
 HKDF_CONTEXT_INFO: bytes = b"HashGuard-v1-Context-Enclosure-Key"
 
-
 def sha256(data: bytes) -> bytes:
     return hashlib.sha256(data).digest()
-
 
 def hkdf_derive_context_key(ikm: bytes) -> bytes:
     prk = hmac.new(b"\x00" * 32, ikm, hashlib.sha256).digest()
     return hmac.new(prk, HKDF_CONTEXT_INFO + b"\x01", hashlib.sha256).digest()[:32]
-
 
 def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
     mask = 0 if difficulty == 0 else ((1 << 32) - 1) ^ ((1 << (32 - difficulty)) - 1)
@@ -45,7 +42,6 @@ def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
         if (prefix & mask) == 0:
             return nonce
         nonce += 1
-
 
 def post_json(endpoint: str, payload: Dict[str, Any]) -> Tuple[int, Any]:
     data = json.dumps(payload).encode("utf-8")
@@ -65,10 +61,7 @@ def post_json(endpoint: str, payload: Dict[str, Any]) -> Tuple[int, Any]:
             parsed = {"raw": body, "error": body}
         return e.code, parsed
 
-
-# ==============================================================================
 # TEST VECTOR 1: ATOMIC ROLLOVER UNDER 50-THREAD CONCURRENT RACE
-# ==============================================================================
 def test_vector_1_rollover_race() -> None:
     print("\n[CHAOS VECTOR 1] Testing Atomic Rollover (k=1 -> k=0) Under 50-Thread Race...")
     user_id = f"usr_chaos_roll_{time.time_ns()}"
@@ -174,10 +167,7 @@ def test_vector_1_rollover_race() -> None:
     print("    [+] PASS: Exactly 1 worker executed atomic rollover (status: ROLLED_OVER_ATOMIC, remaining_step: 50).")
     print("    [+] PASS: 49 concurrent racing workers rejected with HTTP 409 Conflict (0 TOCTOU).")
 
-
-# ==============================================================================
 # TEST VECTOR 2: RFC 8785 JCS NORMALIZATION & PAYLOAD FUZZING
-# ==============================================================================
 def test_vector_2_jcs_fuzzing() -> None:
     print("\n[CHAOS VECTOR 2] Testing RFC 8785 JCS Normalization & Payload Malleability Fuzzing...")
     user_id = f"usr_chaos_jcs_{time.time_ns()}"
@@ -252,10 +242,7 @@ def test_vector_2_jcs_fuzzing() -> None:
         )
         print(f"    [+] PASS: Adversarial Mutation '{desc}' strictly rejected with HTTP 401 Unauthorized.")
 
-
-# ==============================================================================
 # TEST VECTOR 3: STATISTICAL TIMING ATTACK AUDIT (WELCH'S T-TEST)
-# ==============================================================================
 def test_vector_3_timing_side_channel() -> None:
     print("\n[CHAOS VECTOR 3] Auditing Side-Channel Timing Leakage (TVLA Welch's t-test, N = 600)...")
     user_id = f"usr_chaos_timing_{time.time_ns()}"
@@ -327,10 +314,7 @@ def test_vector_3_timing_side_channel() -> None:
     assert abs(t_stat) < 4.5, f"Timing side-channel detected! |t| = {abs(t_stat)} >= 4.5"
     print("    [+] PASS: |t| < 4.5 (NIST TVLA compliant: subtle::ConstantTimeEq exhibits zero timing leakage).")
 
-
-# ==============================================================================
 # TEST VECTOR 4: BOUNDARY AUDIT OF LOOKAHEAD RECOVERY (DELTA = 5 vs 6)
-# ==============================================================================
 def test_vector_4_lookahead_boundary() -> None:
     print("\n[CHAOS VECTOR 4] Testing Strict Lookahead Boundary (Delta = 5 vs Delta = 6)...")
     user_id = f"usr_chaos_boundary_{time.time_ns()}"
@@ -401,10 +385,7 @@ def test_vector_4_lookahead_boundary() -> None:
     assert "ERR_LOOKAHEAD_EXCEEDED" in err_code, f"Unexpected error response: {res}"
     print("    [+] PASS: Delta = 6 exceeded window strictly rejected with HTTP 409 Conflict (ERR_LOOKAHEAD_EXCEEDED).")
 
-
-# ==============================================================================
 # TEST VECTOR 5: ANTI-AIT QUADRATIC DIFFICULTY ESCALATION & CAPACITY RESILIENCE
-# ==============================================================================
 def test_vector_5_anti_ait_escalation() -> None:
     print("\n[CHAOS VECTOR 5] Auditing Anti-AIT Quadratic Difficulty Escalation & Stateless Defense...")
 
@@ -447,7 +428,6 @@ def test_vector_5_anti_ait_escalation() -> None:
     assert avg_mint_time_ms < 2.0, f"Stateless ticket minting too slow: {avg_mint_time_ms} ms"
     print("    [+] PASS: Anti-AIT Economic model verified (Zero State RAM allocation, ~1.9µs HMAC ticket validation).")
 
-
 def main() -> None:
     print("===================================================================")
     print("STARTING HASHGUARD-ID COMMERCIAL-GRADE CHAOS TEST SUITE")
@@ -463,7 +443,6 @@ def main() -> None:
     print("\n===================================================================")
     print("[SUCCESS] ALL HARDCORE COMMERCIAL CHAOS TESTS PASSED (100% AUDIT)")
     print("===================================================================")
-
 
 if __name__ == "__main__":
     main()

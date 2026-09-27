@@ -21,11 +21,9 @@ GATEWAY_URL: str = "http://127.0.0.1:8080"
 HKDF_CONTEXT_INFO: bytes = b"HashGuard-v1-Context-Enclosure-Key"
 TEST_USER_ID: str = "usr_prod_lifecycle_test"
 
-
 def sha256(data: bytes) -> bytes:
     """Computes SHA-256 digest over arbitrary binary stream."""
     return hashlib.sha256(data).digest()
-
 
 def hkdf_extract_and_expand(ikm: bytes, info: bytes = HKDF_CONTEXT_INFO, length: int = 32) -> bytes:
     """
@@ -34,7 +32,6 @@ def hkdf_extract_and_expand(ikm: bytes, info: bytes = HKDF_CONTEXT_INFO, length:
     """
     prk = hmac.new(b"\x00" * 32, ikm, hashlib.sha256).digest()
     return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()[:length]
-
 
 def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
     """
@@ -50,7 +47,6 @@ def solve_hashcash(ticket_hmac_bytes: bytes, difficulty: int) -> int:
             return nonce
         nonce += 1
 
-
 def post_json(endpoint: str, payload: Dict[str, Any]) -> Tuple[int, Any]:
     """Issues hardened HTTP POST request to Edge Gateway."""
     req = urllib.request.Request(
@@ -63,7 +59,6 @@ def post_json(endpoint: str, payload: Dict[str, Any]) -> Tuple[int, Any]:
             return resp.status, json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as err:
         return err.code, err.read().decode("utf-8", errors="replace")
-
 
 def execute_transaction(chal: Dict[str, Any], step: int, token: bytes, tx_payload: Dict[str, Any], nonce: str) -> Tuple[int, Any]:
     """Constructs canonical envelope, signs payload via HKDF-derived key, and submits to Gateway."""
@@ -90,7 +85,6 @@ def execute_transaction(chal: Dict[str, Any], step: int, token: bytes, tx_payloa
     }
     return post_json("/v1/verify", envelope)
 
-
 def generate_chain(length: int) -> Tuple[list[bytes], bytes]:
     """Generates Lamport reverse hash chain from 256-bit CSPRNG entropy."""
     seed = os.urandom(32)
@@ -98,7 +92,6 @@ def generate_chain(length: int) -> Tuple[list[bytes], bytes]:
     for _ in range(length):
         chain.append(sha256(chain[-1]))
     return chain, chain[-1]
-
 
 def main() -> None:
     print("===================================================================")
@@ -168,7 +161,6 @@ def main() -> None:
     print("\n===================================================================")
     print("ALL NEGATIVE-SPACE RECOVERY & CONCURRENCY CONSTRAINTS VERIFIED")
     print("===================================================================")
-
 
 if __name__ == "__main__":
     main()
