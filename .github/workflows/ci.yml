@@ -2,9 +2,9 @@ name: HashGuard-ID Security & Cryptographic Invariants CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main ]
 
 jobs:
   audit-and-verify:
@@ -23,46 +23,53 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout Codebase
+      - name: 1. Checkout Codebase
         uses: actions/checkout@v4
 
-      - name: Setup Rust Toolchain
+      - name: 2. Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          components: rustfmt, clippy
 
-      - name: Setup Python Environment
+      - name: 3. Setup Python 3.11 Runtime
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Security Audit & Formatting Check
-        run: |
-          cargo fmt --all -- --check
-          cargo clippy --all-targets -- -D warnings
+      - name: 4. Check Code Formatting (rustfmt)
+        run: cargo fmt --all -- --check
 
-      - name: Execute Native Rust Test Suite
-        run: cargo test --all -- --nocapture
+      - name: 5. Verify Zero-Warning Linting (clippy)
+        run: cargo clippy --all-targets -- -D warnings
 
-      - name: Build Production Edge Gateway
-        run: cargo build --bin gateway --release
-
-      - name: Start Gateway Daemon
-        run: |
-          REDIS_URL="redis://127.0.0.1:6379" target/release/gateway &
-          sleep 2
-
-      - name: Verify Documentation Synchronization
+      - name: 6. Verify Documentation Synchronization
         run: python scripts/generate_readme.py --check
 
-      - name: Execute Concurrency & TOCTOU Verification (50 Threads)
+      - name: 7. Native Cryptographic Invariants Test Suite
+        run: cargo test --all -- --nocapture
+
+      - name: 8. Build Production Edge Gateway
+        run: cargo build --release --bin gateway
+
+      - name: 9. Start Background Gateway Daemon
+        run: |
+          REDIS_URL="redis://127.0.0.1:6379" target/release/gateway &
+          sleep 3
+
+      - name: 10. Concurrency & TOCTOU Audit (50 Racing Threads)
         run: python scripts/test_gateway_concurrency.py
 
-      - name: Execute Delta-Lookahead & Silent Rollover Suite
+      - name: 11. Mobile Packet-Loss Desync & Silent Rollover Audit
         run: python scripts/test_lookahead_recovery.py
 
-      - name: Execute Adversarial Negative-Space Attacks
+      - name: 12. Adversarial Negative-Space Audit (Replay, Tampering, Forgery)
         run: python scripts/adversarial_simulation.py
 
-      - name: Validate SLA Latency Budget (p99 < 20ms)
+      - name: 13. Hardcore Commercial Chaos Suite (Welch's t-test, Rollover Race)
+        run: python scripts/chaos_adversarial_suite.py
+
+      - name: 14. Realistic WAN & Cellular Simulation (Jitter, Packet-Loss, Endurance)
+        run: python scripts/realistic_wan_simulation.py
+
+      - name: 15. Full SLA Benchmark & Latency Budget Verification (N = 500)
         run: python scripts/benchmark_sla.py

@@ -1,6 +1,7 @@
 //! # HashGuard-ID Production Edge Verification Gateway
 //! Standards: RFC 2289, RFC 2104, RFC 5869, RFC 8785, NIST SP 800-63B (§5.1.3.2).
 //! Architecture: Zero-Telecom, Stateless Challenge Minting, Hardware-Offloaded Delta-Lookahead CAS.
+//! Cluster Compliance: Enforces Redis Cluster Hash Tags {user:<id>} to eliminate CROSSSLOT errors.
 
 use axum::{
     extract::{DefaultBodyLimit, State},
@@ -33,8 +34,14 @@ fn default_user_id() -> String {
 
 /// Atomic Redis Lua CAS Script with Hardware-Offloaded Lookahead & Silent Re-anchoring.
 /// Complexity: O(1) time, O(1) space on Redis single-threaded engine.
+/// Redis Cluster Safety: Keys are explicitly declared in KEYS[1..5] with identical Hash Tag {user:<id>}.
 const LUA_HARDENED_CAS_SCRIPT: &str = r#"
-local user_id = KEYS[1]
+local anchor_key = KEYS[1]
+local step_key = KEYS[2]
+local nonce_key = KEYS[3]
+local pending_anchor_key = KEYS[4]
+local pending_step_key = KEYS[5]
+
 local claimed_step = tonumber(ARGV[1])
 local claimed_token = ARGV[2]
 local nonce = ARGV[3]
@@ -42,12 +49,6 @@ local nonce_ttl = tonumber(ARGV[4])
 local max_lookahead = tonumber(ARGV[5])
 local next_anchor = ARGV[6]
 local next_steps = tonumber(ARGV[7])
-
-local anchor_key = "user:" .. user_id .. ":anchor"
-local step_key = "user:" .. user_id .. ":step"
-local nonce_key = "nonce:" .. nonce
-local pending_anchor_key = "user:" .. user_id .. ":pending_anchor"
-local pending_step_key = "user:" .. user_id .. ":pending_step"
 
 -- 1. Enforce Nonce Replay Immunity
 if redis.call("EXISTS", nonce_key) == 1 then
@@ -185,8 +186,10 @@ pub async fn enroll_handler(
             )
         })?;
 
-    let anchor_key = format!("user:{}:anchor", payload.user_id);
-    let step_key = format!("user:{}:step", payload.user_id);
+    // Enforce Redis Cluster Hash Tag {user:<id>}
+    let tag = format!("{{user:{}}}", payload.user_id);
+    let anchor_key = format!("{}:anchor", tag);
+    let step_key = format!("{}:step", tag);
     let anchor_hex = payload.terminal_anchor.to_lowercase();
 
     redis::pipe()
@@ -311,7 +314,6 @@ pub async fn verify_transaction_handler(
     }
 
     // 4. Precompute Lookahead Hashes on Gateway CPU (Hardware SHA-NI Accelerated)
-    // Candidate[d] = H^d(token_bytes), d in [1, MAX_LOOKAHEAD_STEPS]
     let mut lookahead_hashes = Vec::with_capacity(MAX_LOOKAHEAD_STEPS);
     let mut cursor = token_bytes;
     for _ in 0..MAX_LOOKAHEAD_STEPS {
@@ -340,7 +342,7 @@ pub async fn verify_transaction_handler(
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
 
-    // 5. Atomic Redis Lua CAS Execution (Spec Item 2)
+    // 5. Atomic Redis Lua CAS Execution: Enforce Cluster Hash Tags across all keys
     let mut conn = state
         .redis_client
         .get_async_connection()
@@ -352,12 +354,25 @@ pub async fn verify_transaction_handler(
             )
         })?;
 
+    // All keys share the exact same hash tag {user:<id>}, guaranteeing identical slot routing
+    let tag = format!("{{user:{}}}", req.user_id);
+    let anchor_key = format!("{}:anchor", tag);
+    let step_key = format!("{}:step", tag);
+    let nonce_key = format!("{}:nonce:{}", tag, effective_nonce);
+    let pending_anchor_key = format!("{}:pending_anchor", tag);
+    let pending_step_key = format!("{}:pending_step", tag);
+
     let script = redis::Script::new(LUA_HARDENED_CAS_SCRIPT);
-    let mut invocation = script.key(&req.user_id);
+    // Bind owned ScriptInvocation to local mutable variable to resolve E0716 lifetime drop
+    let mut invocation = script.key(anchor_key);
     invocation
+        .key(step_key)
+        .key(nonce_key)
+        .key(pending_anchor_key)
+        .key(pending_step_key)
         .arg(req.step_index)
         .arg(req.token.to_lowercase())
-        .arg(&effective_nonce)
+        .arg(effective_nonce)
         .arg(NONCE_TTL_SECONDS)
         .arg(MAX_LOOKAHEAD_STEPS)
         .arg(next_anchor)
@@ -445,12 +460,12 @@ async fn main() {
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
 
     println!("=======================================================");
-    println!("HASHGUARD-ID GATEWAY (LOOKAHEAD & RE-ANCHORING ACTIVE)");
+    println!("HASHGUARD-ID GATEWAY (CLUSTER-PROOF HASH TAGS ACTIVE)");
     println!("=======================================================");
     println!("Listening on             : http://{}", addr);
     println!("Max Lookahead Steps (Δ)  : {} hops", MAX_LOOKAHEAD_STEPS);
     println!("Silent Rollover Support  : Enabled (k = 0 Atomic Transition)");
-    println!("Distributed State Engine : Redis Lua (0 TOCTOU)");
+    println!("Distributed State Engine : Redis Lua CAS (Zero CROSSSLOT)");
     println!("Standards Compliance     : RFC 2289, RFC 2104, RFC 5869, RFC 8785");
     println!("=======================================================");
 

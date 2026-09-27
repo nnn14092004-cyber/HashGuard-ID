@@ -1,6 +1,6 @@
 //! # Distributed Atomic State Store (Redis CAS Engine)
-//! Standards: RFC 2289, RFC 2104, NIST SP 800-63B (§5.1.3.2).
-//! Guarantees: Zero-TOCTOU, O(1) time complexity, strictly monotonic sequence progression.
+//! Standards: RFC 2289, RFC 2104, NIST SP 800-63B (§5.1.3.2), Redis Cluster Specification.
+//! Guarantees: Zero-TOCTOU, O(1) complexity, Cluster Hash Slot Alignment via Hash Tags.
 
 use crate::HashGuardError;
 use redis::aio::ConnectionLike;
@@ -9,13 +9,11 @@ use sha2::{Digest, Sha256};
 
 pub const DEFAULT_NONCE_TTL_SECONDS: u64 = 300;
 
-/// Atomic storage adapter for state anchors.
 pub struct RedisAnchorStore {
     cas_script: Script,
 }
 
 impl RedisAnchorStore {
-    /// Compiles and caches the atomic CAS Lua script.
     pub fn new() -> Self {
         let script_source = include_str!("../scripts/anchor_cas.lua");
         Self {
@@ -23,7 +21,6 @@ impl RedisAnchorStore {
         }
     }
 
-    /// Initializes a user anchor state in Redis.
     pub async fn initialize_user<C>(
         &self,
         con: &mut C,
@@ -34,12 +31,13 @@ impl RedisAnchorStore {
     where
         C: AsyncCommands,
     {
-        let key = format!("hashguard:anchor:{}", account_id);
+        // Enforce Redis Cluster Hash Tag
+        let state_key = format!("{{hashguard:user:{}}}:state", account_id);
         let anchor_hex = hex::encode(anchor);
 
         let () = con
             .hset_multiple(
-                &key,
+                &state_key,
                 &[("anchor", &anchor_hex), ("step", &total_steps.to_string())],
             )
             .await
@@ -48,9 +46,6 @@ impl RedisAnchorStore {
         Ok(())
     }
 
-    /// Executes atomic CAS verification and sequence advance.
-    /// Time Complexity: O(1)
-    /// Space Complexity: O(1)
     pub async fn atomic_verify_and_advance<C>(
         &self,
         con: &mut C,
@@ -69,8 +64,9 @@ impl RedisAnchorStore {
         let expected_anchor_hex = hex::encode(expected_anchor);
         let token_hex = hex::encode(token);
 
-        let state_key = format!("hashguard:anchor:{}", account_id);
-        let nonce_key = format!("hashguard:nonce:{}", nonce);
+        // Both keys share the exact same hash tag {hashguard:user:<id>}, eliminating CROSSSLOT errors
+        let state_key = format!("{{hashguard:user:{}}}:state", account_id);
+        let nonce_key = format!("{{hashguard:user:{}}}:nonce:{}", account_id, nonce);
 
         let result: Result<(i32, usize), redis::RedisError> = self
             .cas_script

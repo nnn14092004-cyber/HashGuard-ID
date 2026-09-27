@@ -1,9 +1,10 @@
 -- HashGuard-ID Atomic Compare-And-Swap (CAS) & Replay Defense Engine
--- Standards: NIST SP 800-63B, RFC 2289
+-- Standards: NIST SP 800-63B (§5.1.3.2), RFC 2289, Redis Cluster Specification
 -- Complexity: Time O(1), Space O(1)
+-- Cluster Invariant: Keys MUST share the identical Hash Tag {hashguard:user:<account_id>}
 
--- KEYS[1]: User State Key ("hashguard:anchor:<account_id>")
--- KEYS[2]: Nonce Key      ("hashguard:nonce:<nonce_value>")
+-- KEYS[1]: User State Hash Key ("{hashguard:user:<account_id>}:state")
+-- KEYS[2]: Replay Nonce Key     ("{hashguard:user:<account_id>}:nonce:<nonce_value>")
 
 -- ARGV[1]: Expected Current Anchor (Hex-encoded 32 bytes: H(T_k))
 -- ARGV[2]: New Anchor Token (Hex-encoded 32 bytes: T_k)
@@ -24,7 +25,7 @@ if not current_anchor or not current_step then
     return redis.error_reply("ERR_ANCHOR_UNINITIALIZED")
 end
 
--- 3. Monotonic Decreasing Enclosure
+-- 3. Monotonic Decreasing Sequence Enclosure
 local claimed_step = tonumber(ARGV[3])
 if claimed_step >= current_step then
     return redis.error_reply("ERR_SEQUENCE_VIOLATION")
@@ -35,7 +36,7 @@ if current_anchor ~= ARGV[1] then
     return redis.error_reply("ERR_PREIMAGE_MISMATCH")
 end
 
--- 5. Atomic State Transition & Nonce Invalidation
+-- 5. Atomic State Transition & Nonce Invalidation (O(1))
 redis.call('HSET', KEYS[1], 'anchor', ARGV[2], 'step', claimed_step)
 redis.call('SETEX', KEYS[2], tonumber(ARGV[5]), ARGV[4])
 
