@@ -454,6 +454,16 @@ async fn main() {
     println!("Standards Compliance     : RFC 2289, RFC 2104, RFC 5869, RFC 8785");
     println!("=======================================================");
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(err) => {
+            eprintln!(
+                "[FATAL] Cannot bind to {}: {}. Ensure port is not occupied.",
+                addr, err
+            );
+            std::process::exit(1);
+        }
+    };
+
     axum::serve(listener, app).await.unwrap();
 }
