@@ -1,7 +1,6 @@
-//! # HashGuard-ID Production Edge Verification Gateway
+//! HashGuard-ID Production Edge Verification Gateway
 //! Standards: RFC 2289, RFC 2104, RFC 5869, RFC 8785, NIST SP 800-63B (§5.1.3.2).
-//! Architecture: Zero-Telecom, Stateless Challenge Minting, Hardware-Offloaded Delta-Lookahead CAS.
-//! Cluster Compliance: Enforces Redis Cluster Hash Tags {user:<id>} to eliminate CROSSSLOT errors.
+//! Architecture: Persistent Multiplexed CAS Pipeline, Zero Per-Request Socket Overhead.
 
 use axum::{
     extract::{DefaultBodyLimit, State},
@@ -22,9 +21,10 @@ use tower_http::cors::{Any, CorsLayer};
 
 type HmacSha256 = Hmac<Sha256>;
 
-pub const MAX_PAYLOAD_BYTES: usize = 2048; // Hard socket buffer limit (anti-exhaustion)
-pub const MAX_LOOKAHEAD_STEPS: usize = 5; // Bounded packet loss desync tolerance: Delta <= 5
-pub const NONCE_TTL_SECONDS: usize = 300; // 5-minute replay prevention lock
+pub const MAX_PAYLOAD_BYTES: usize = 2048;
+pub const MAX_LOOKAHEAD_STEPS: usize = 5;
+pub const NONCE_TTL_SECONDS: usize = 300;
+pub const TCP_LISTEN_BACKLOG: u32 = 2048;
 
 const HKDF_CONTEXT_INFO: &[u8] = b"HashGuard-v1-Context-Enclosure-Key";
 
@@ -32,9 +32,6 @@ fn default_user_id() -> String {
     "default_user".to_string()
 }
 
-/// Atomic Redis Lua CAS Script with Hardware-Offloaded Lookahead & Silent Re-anchoring.
-/// Complexity: O(1) time, O(1) space on Redis single-threaded engine.
-/// Redis Cluster Safety: Keys are explicitly declared in KEYS[1..5] with identical Hash Tag {user:<id>}.
 const LUA_HARDENED_CAS_SCRIPT: &str = r#"
 local anchor_key = KEYS[1]
 local step_key = KEYS[2]
@@ -50,12 +47,10 @@ local max_lookahead = tonumber(ARGV[5])
 local next_anchor = ARGV[6]
 local next_steps = tonumber(ARGV[7])
 
--- 1. Enforce Nonce Replay Immunity
 if redis.call("EXISTS", nonce_key) == 1 then
     return redis.error_reply("ERR_NONCE_REPLAY")
 end
 
--- 2. Verify Identity Existence & Monotonic Sequence Descent
 local current_step = tonumber(redis.call("GET", step_key))
 if not current_step then
     return redis.error_reply("ERR_USER_NOT_FOUND")
@@ -65,13 +60,11 @@ if claimed_step >= current_step then
     return redis.error_reply("ERR_SEQUENCE_VIOLATION")
 end
 
--- 3. Assert Bounded Lookahead Window
 local delta = current_step - claimed_step
 if delta > max_lookahead then
     return redis.error_reply("ERR_LOOKAHEAD_EXCEEDED")
 end
 
--- 4. O(1) Anchor Matching via Offloaded Precomputed Candidates: ARGV[7 + delta]
 local expected_anchor = ARGV[7 + delta]
 local current_anchor = redis.call("GET", anchor_key)
 
@@ -79,18 +72,15 @@ if expected_anchor ~= current_anchor then
     return redis.error_reply("ERR_PREIMAGE_MISMATCH")
 end
 
--- 5. Atomic State Transition
 redis.call("SET", anchor_key, claimed_token)
 redis.call("SET", step_key, claimed_step)
 redis.call("SET", nonce_key, "1", "EX", nonce_ttl)
 
--- 6. Register Piggybacked Successor Anchor (Silent Re-anchoring)
 if next_anchor and #next_anchor == 64 and next_steps and next_steps > 0 then
     redis.call("SET", pending_anchor_key, next_anchor)
     redis.call("SET", pending_step_key, next_steps)
 end
 
--- 7. Atomic Chain Rollover when Claimed Step reaches Terminal Boundary (k = 0)
 if claimed_step == 0 then
     local p_anchor = redis.call("GET", pending_anchor_key)
     local p_steps = tonumber(redis.call("GET", pending_step_key))
@@ -108,7 +98,7 @@ return {claimed_step, claimed_token, "COMMITTED_ATOMIC"}
 
 pub struct GatewayState {
     pub ephemeral_secret: [u8; 32],
-    pub redis_client: redis::Client,
+    pub redis_conn: redis::aio::MultiplexedConnection,
 }
 
 #[derive(Deserialize)]
@@ -175,23 +165,12 @@ pub async fn enroll_handler(
         ));
     }
 
-    let mut conn = state
-        .redis_client
-        .get_async_connection()
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Redis connection error: {}", e),
-            )
-        })?;
-
-    // Enforce Redis Cluster Hash Tag {user:<id>}
     let tag = format!("{{user:{}}}", payload.user_id);
     let anchor_key = format!("{}:anchor", tag);
     let step_key = format!("{}:step", tag);
     let anchor_hex = payload.terminal_anchor.to_lowercase();
 
+    let mut conn = state.redis_conn.clone();
     redis::pipe()
         .atomic()
         .set(&anchor_key, &anchor_hex)
@@ -201,7 +180,7 @@ pub async fn enroll_handler(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Redis pipeline write failure: {}", e),
+                format!("Redis pipeline write error: {}", e),
             )
         })?;
 
@@ -249,7 +228,6 @@ pub async fn verify_transaction_handler(
         .unwrap()
         .as_secs();
 
-    // 1. Decode byte representations
     let ticket_hmac_bytes: [u8; 32] = hex::decode(&req.ticket_hmac)
         .map_err(|_| (StatusCode::BAD_REQUEST, "Malformed ticket HMAC".into()))?
         .try_into()
@@ -265,7 +243,6 @@ pub async fn verify_transaction_handler(
         .try_into()
         .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid signature length".into()))?;
 
-    // 2. Stateless Proof-of-Work Verification (Spec Item 3)
     let ticket = ChallengeTicket {
         client_ip: req.client_ip,
         timestamp: req.timestamp,
@@ -285,11 +262,10 @@ pub async fn verify_transaction_handler(
         ));
     }
 
-    // 3. Cryptographic Context Verification: RFC 8785 JCS + RFC 5869 HKDF + RFC 2104 HMAC (Spec Item 1)
     let canonical_bytes = serde_jcs::to_vec(&req.canonical_payload).map_err(|_| {
         (
             StatusCode::BAD_REQUEST,
-            "RFC 8785 Canonicalization failed".into(),
+            "RFC 8785 canonicalization failed".into(),
         )
     })?;
 
@@ -300,7 +276,7 @@ pub async fn verify_transaction_handler(
     let hk = Hkdf::<Sha256>::new(None, &token_bytes);
     let mut signing_key = [0u8; 32];
     hk.expand(HKDF_CONTEXT_INFO, &mut signing_key)
-        .expect("Valid 32-byte expansion");
+        .expect("Valid 32-byte HKDF expansion");
 
     let mut mac = HmacSha256::new_from_slice(&signing_key).unwrap();
     mac.update(&payload_digest);
@@ -313,7 +289,6 @@ pub async fn verify_transaction_handler(
         ));
     }
 
-    // 4. Precompute Lookahead Hashes on Gateway CPU (Hardware SHA-NI Accelerated)
     let mut lookahead_hashes = Vec::with_capacity(MAX_LOOKAHEAD_STEPS);
     let mut cursor = token_bytes;
     for _ in 0..MAX_LOOKAHEAD_STEPS {
@@ -324,7 +299,6 @@ pub async fn verify_transaction_handler(
         cursor = digest;
     }
 
-    // Derive deterministic fallback nonce if empty
     let effective_nonce = if req.nonce.is_empty() {
         hex::encode(&signature_bytes[..16])
     } else {
@@ -342,19 +316,6 @@ pub async fn verify_transaction_handler(
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
 
-    // 5. Atomic Redis Lua CAS Execution: Enforce Cluster Hash Tags across all keys
-    let mut conn = state
-        .redis_client
-        .get_async_connection()
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Redis disconnected: {}", e),
-            )
-        })?;
-
-    // All keys share the exact same hash tag {user:<id>}, guaranteeing identical slot routing
     let tag = format!("{{user:{}}}", req.user_id);
     let anchor_key = format!("{}:anchor", tag);
     let step_key = format!("{}:step", tag);
@@ -363,7 +324,6 @@ pub async fn verify_transaction_handler(
     let pending_step_key = format!("{}:pending_step", tag);
 
     let script = redis::Script::new(LUA_HARDENED_CAS_SCRIPT);
-    // Bind owned ScriptInvocation to local mutable variable to resolve E0716 lifetime drop
     let mut invocation = script.key(anchor_key);
     invocation
         .key(step_key)
@@ -382,6 +342,7 @@ pub async fn verify_transaction_handler(
         invocation.arg(candidate);
     }
 
+    let mut conn = state.redis_conn.clone();
     let result: Result<(usize, String, String), redis::RedisError> =
         invocation.invoke_async(&mut conn).await;
 
@@ -431,36 +392,42 @@ pub fn create_gateway_app(state: Arc<GatewayState>) -> Router {
         .with_state(state)
 }
 
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("Failed to register termination handler");
+}
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut ephemeral_secret = [0u8; 32];
     getrandom::getrandom(&mut ephemeral_secret).expect("CSPRNG failure");
 
     let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
-    let redis_client =
-        redis::Client::open(redis_url.clone()).expect("Failed to initialize Redis client");
+    let redis_client = redis::Client::open(redis_url.clone())?;
 
-    match redis_client.get_async_connection().await {
-        Ok(_) => println!(
-            "[+] Connected to Distributed Redis State Engine at: {}",
-            redis_url
-        ),
-        Err(e) => {
-            eprintln!("[-] Fatal: Cannot connect to Redis at {}: {}", redis_url, e);
-            std::process::exit(1);
-        }
-    }
+    let redis_conn = redis_client.get_multiplexed_tokio_connection().await?;
+    println!(
+        "[+] Persistent Multiplexed Redis Pipeline active on: {}",
+        redis_url
+    );
 
     let state = Arc::new(GatewayState {
         ephemeral_secret,
-        redis_client,
+        redis_conn,
     });
 
     let app = create_gateway_app(state);
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    let addr: SocketAddr = "127.0.0.1:8080".parse()?;
+
+    let socket = tokio::net::TcpSocket::new_v4()?;
+    socket.set_reuseaddr(true)?;
+    socket.set_nodelay(true)?;
+    socket.bind(addr)?;
+    let listener = socket.listen(TCP_LISTEN_BACKLOG)?;
 
     println!("=======================================================");
-    println!("HASHGUARD-ID GATEWAY (CLUSTER-PROOF HASH TAGS ACTIVE)");
+    println!("HASHGUARD-ID GATEWAY (MULTIPLEXED PIPELINE ACTIVE)");
     println!("=======================================================");
     println!("Listening on             : http://{}", addr);
     println!("Max Lookahead Steps (Δ)  : {} hops", MAX_LOOKAHEAD_STEPS);
@@ -469,16 +436,9 @@ async fn main() {
     println!("Standards Compliance     : RFC 2289, RFC 2104, RFC 5869, RFC 8785");
     println!("=======================================================");
 
-    let listener = match tokio::net::TcpListener::bind(&addr).await {
-        Ok(l) => l,
-        Err(err) => {
-            eprintln!(
-                "[FATAL] Cannot bind to {}: {}. Ensure port is not occupied.",
-                addr, err
-            );
-            std::process::exit(1);
-        }
-    };
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
-    axum::serve(listener, app).await.unwrap();
+    Ok(())
 }
