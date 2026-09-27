@@ -27,7 +27,7 @@ impl ClientChain {
 
         for i in 0..length {
             let mut hasher = Sha256::new();
-            hasher.update(&chain[i]);
+            hasher.update(chain[i]);
             let output: [u8; HASH_OUTPUT_LENGTH] = hasher.finalize().into();
             chain.push(output);
         }

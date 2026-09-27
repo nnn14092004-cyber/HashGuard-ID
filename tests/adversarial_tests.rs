@@ -33,13 +33,18 @@ fn test_nominal_lamport_lifecycle() {
         let envelope = TransactionEnvelope::seal(step, token, &tx).unwrap();
 
         assert!(envelope.verify_binding().is_ok());
-        assert!(server.verify_and_transition(&envelope.token, envelope.step_index).is_ok());
+        assert!(server
+            .verify_and_transition(&envelope.token, envelope.step_index)
+            .is_ok());
 
         assert_eq!(server.anchor, token);
         assert_eq!(server.step, step);
     }
 
-    assert_eq!(client.advance().unwrap_err(), HashGuardError::ChainExhausted);
+    assert_eq!(
+        client.advance().unwrap_err(),
+        HashGuardError::ChainExhausted
+    );
 }
 
 #[test]
@@ -74,10 +79,15 @@ fn test_adversary_replay_attack() {
     let envelope = TransactionEnvelope::seal(step, token, &tx).unwrap();
 
     assert!(envelope.verify_binding().is_ok());
-    assert!(server.verify_and_transition(&envelope.token, envelope.step_index).is_ok());
+    assert!(server
+        .verify_and_transition(&envelope.token, envelope.step_index)
+        .is_ok());
 
     let replay_result = server.verify_and_transition(&envelope.token, envelope.step_index);
-    assert_eq!(replay_result.unwrap_err(), HashGuardError::SequenceViolation);
+    assert_eq!(
+        replay_result.unwrap_err(),
+        HashGuardError::SequenceViolation
+    );
 }
 
 #[test]
@@ -91,7 +101,10 @@ fn test_adversary_preimage_forgery() {
 
     assert!(envelope.verify_binding().is_ok());
     let transition_result = server.verify_and_transition(&envelope.token, envelope.step_index);
-    assert_eq!(transition_result.unwrap_err(), HashGuardError::InvalidPreimage);
+    assert_eq!(
+        transition_result.unwrap_err(),
+        HashGuardError::InvalidPreimage
+    );
 }
 
 #[test]
@@ -125,5 +138,8 @@ fn test_adversary_pow_rate_penalty_and_ttl_expiration() {
     assert_eq!(ticket_attack.difficulty_bits, 18);
 
     let expired_result = ticket_attack.verify_ticket(timestamp + 11, &secret);
-    assert_eq!(expired_result.unwrap_err(), HashGuardError::ChallengeExpired);
+    assert_eq!(
+        expired_result.unwrap_err(),
+        HashGuardError::ChallengeExpired
+    );
 }

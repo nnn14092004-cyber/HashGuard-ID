@@ -90,7 +90,7 @@ impl ProtocolPipeline {
 
         // 3.2 Verify Lamport step: H(T_k) == CurrentAnchor
         let mut hasher = Sha256::new();
-        hasher.update(&request.envelope.token);
+        hasher.update(request.envelope.token);
         let computed_anchor: [u8; HASH_OUTPUT_LENGTH] = hasher.finalize().into();
 
         if computed_anchor.ct_eq(current_anchor).unwrap_u8() != 1 {

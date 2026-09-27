@@ -14,9 +14,10 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn test_gateway_enforce_payload_size_limit() {
     let app = axum::Router::new()
-        .route("/v1/challenge", axum::routing::post(|_: axum::Json<serde_json::Value>| async {
-            StatusCode::OK
-        }))
+        .route(
+            "/v1/challenge",
+            axum::routing::post(|_: axum::Json<serde_json::Value>| async { StatusCode::OK }),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(2048));
 
     // Construct oversized payload (> 2048 bytes) to verify socket buffer protection
@@ -59,8 +60,8 @@ fn test_stateless_pow_evaluation_cycle() {
 
     loop {
         let mut hasher = Sha256::new();
-        hasher.update(&ticket.server_hmac);
-        hasher.update(&nonce.to_be_bytes());
+        hasher.update(ticket.server_hmac);
+        hasher.update(nonce.to_be_bytes());
         let digest = hasher.finalize();
         let prefix = u32::from_be_bytes(digest[..4].try_into().unwrap());
 

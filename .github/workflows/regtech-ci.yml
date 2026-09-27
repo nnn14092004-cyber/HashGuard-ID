@@ -1,0 +1,63 @@
+name: HashGuard-ID RegTech Compliance & Cryptographic Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  compliance-audit:
+    name: Standards Compliance & Anti-TOCTOU Verification
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 1. Verify Documentation Synchronization
+        run: python scripts/generate_readme.py --check
+
+      - name: 2. Core Cryptographic Invariants Test (Rust Native)
+        run: cargo test --all -- --nocapture
+
+      - name: 3. Build Production Edge Gateway
+        run: cargo build --release --bin gateway
+
+      - name: 4. Start Edge Gateway Daemon
+        run: |
+          REDIS_URL="redis://127.0.0.1:6379" target/release/gateway &
+          sleep 2
+
+      - name: 5. Execute 50-Thread TOCTOU Race Condition Audit
+        run: python scripts/test_gateway_concurrency.py
+
+      - name: 6. Execute Lookahead Desync & Rollover Audit
+        run: python scripts/test_lookahead_recovery.py
+
+      - name: 7. Execute Adversarial Negative-Space Audit
+        run: python scripts/adversarial_simulation.py
+
+      - name: 8. Execute SLA Benchmark (Assert p99 < 20ms)
+        run: python scripts/benchmark_sla.py

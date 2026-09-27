@@ -56,12 +56,31 @@ fn test_end_to_end_nominal_lifecycle_and_sla() {
     println!("\n=======================================================");
     println!("HASHGUARD-ID PROTOCOL TELEMETRY REPORT (E2E SLA)");
     println!("=======================================================");
-    println!("Client PoW Solve Time (D=10) : {:.3} ms", client_solve_duration.as_secs_f64() * 1000.0);
-    println!("Server PoW Verification       : {:.3} µs", telemetry.pow_verification_nanos as f64 / 1000.0);
-    println!("Server Context Verification   : {:.3} µs", telemetry.context_verification_nanos as f64 / 1000.0);
-    println!("Server Total Core Execution   : {:.3} µs", telemetry.total_pipeline_nanos as f64 / 1000.0);
-    println!("Total Protocol Processing     : {:.3} ms", (client_solve_duration.as_secs_f64() * 1000.0) + (telemetry.total_pipeline_nanos as f64 / 1_000_000.0));
-    println!("Remaining Lamport Depth       : {}", telemetry.remaining_chain_depth);
+    println!(
+        "Client PoW Solve Time (D=10) : {:.3} ms",
+        client_solve_duration.as_secs_f64() * 1000.0
+    );
+    println!(
+        "Server PoW Verification       : {:.3} µs",
+        telemetry.pow_verification_nanos as f64 / 1000.0
+    );
+    println!(
+        "Server Context Verification   : {:.3} µs",
+        telemetry.context_verification_nanos as f64 / 1000.0
+    );
+    println!(
+        "Server Total Core Execution   : {:.3} µs",
+        telemetry.total_pipeline_nanos as f64 / 1000.0
+    );
+    println!(
+        "Total Protocol Processing     : {:.3} ms",
+        (client_solve_duration.as_secs_f64() * 1000.0)
+            + (telemetry.total_pipeline_nanos as f64 / 1_000_000.0)
+    );
+    println!(
+        "Remaining Lamport Depth       : {}",
+        telemetry.remaining_chain_depth
+    );
     println!("=======================================================");
 
     // SLA Assertions: Spec.docx Item 3 requires latency < 20ms for legitimate traffic

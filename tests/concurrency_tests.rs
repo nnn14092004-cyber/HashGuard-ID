@@ -60,18 +60,21 @@ impl MockRedisLuaEngine {
 #[tokio::test]
 async fn test_toctou_atomic_race_condition_simulation() {
     let chain_len = 100;
-    let (mut client_chain, initial_anchor) = ClientChain::generate(chain_len)
-        .expect("CSPRNG seed generation failed");
+    let (mut client_chain, initial_anchor) =
+        ClientChain::generate(chain_len).expect("CSPRNG seed generation failed");
 
     // Shared state protected by an asynchronous mutex (representing Redis single-threaded execution)
-    let engine = Arc::new(Mutex::new(MockRedisLuaEngine::new(initial_anchor, chain_len)));
+    let engine = Arc::new(Mutex::new(MockRedisLuaEngine::new(
+        initial_anchor,
+        chain_len,
+    )));
 
     // Client extracts token at step k = 99
     let (step, token) = client_chain.advance().expect("Premature chain depletion");
 
     // Pre-calculate expected current anchor: H(T_k)
     let mut hasher = Sha256::new();
-    hasher.update(&token);
+    hasher.update(token);
     let expected_anchor: [u8; 32] = hasher.finalize().into();
 
     let concurrency_count = 50;

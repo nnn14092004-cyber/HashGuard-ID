@@ -65,8 +65,8 @@ impl TransactionEnvelope {
         let signing_key = Self::derive_signing_key(&token);
 
         // RFC 2104 HMAC-SHA256 Signature
-        let mut mac = HmacSha256::new_from_slice(&signing_key)
-            .expect("HMAC accepts 256-bit derived key");
+        let mut mac =
+            HmacSha256::new_from_slice(&signing_key).expect("HMAC accepts 256-bit derived key");
         mac.update(&payload_digest);
         let signature: [u8; 32] = mac.finalize().into_bytes().into();
 
@@ -88,8 +88,8 @@ impl TransactionEnvelope {
 
         let signing_key = Self::derive_signing_key(&self.token);
 
-        let mut mac = HmacSha256::new_from_slice(&signing_key)
-            .expect("HMAC accepts 256-bit derived key");
+        let mut mac =
+            HmacSha256::new_from_slice(&signing_key).expect("HMAC accepts 256-bit derived key");
         mac.update(&payload_digest);
         let expected_signature: [u8; 32] = mac.finalize().into_bytes().into();
 

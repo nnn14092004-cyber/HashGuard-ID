@@ -10,9 +10,9 @@ use subtle::ConstantTimeEq;
 pub type HmacSha256 = Hmac<Sha256>;
 
 pub const BASE_DIFFICULTY_BITS: u32 = 10; // ~1,024 hashes (<2ms SLA guarantee across all hardware)
-pub const MAX_DIFFICULTY_BITS: u32 = 26;  // ~67,108,864 hashes (Botnet lockup)
+pub const MAX_DIFFICULTY_BITS: u32 = 26; // ~67,108,864 hashes (Botnet lockup)
 pub const VELOCITY_THRESHOLD_RPM: u32 = 3;
-pub const TICKET_TTL_SECONDS: u64 = 10;   // Bounded time window against pre-computation
+pub const TICKET_TTL_SECONDS: u64 = 10; // Bounded time window against pre-computation
 
 /// Stateless challenge ticket issued by Edge Gateway.
 #[derive(Debug, Clone)]
@@ -29,8 +29,7 @@ impl ChallengeTicket {
         let difficulty_bits = Self::calculate_difficulty(velocity_rpm);
         let payload = format!("{}:{}:{}", client_ip, timestamp, difficulty_bits);
 
-        let mut mac = HmacSha256::new_from_slice(secret_key)
-            .expect("HMAC accepts 256-bit key");
+        let mut mac = HmacSha256::new_from_slice(secret_key).expect("HMAC accepts 256-bit key");
         mac.update(payload.as_bytes());
         let server_hmac: [u8; 32] = mac.finalize().into_bytes().into();
 
@@ -63,9 +62,11 @@ impl ChallengeTicket {
             return Err(HashGuardError::ChallengeExpired);
         }
 
-        let payload = format!("{}:{}:{}", self.client_ip, self.timestamp, self.difficulty_bits);
-        let mut mac = HmacSha256::new_from_slice(secret_key)
-            .expect("HMAC accepts 256-bit key");
+        let payload = format!(
+            "{}:{}:{}",
+            self.client_ip, self.timestamp, self.difficulty_bits
+        );
+        let mut mac = HmacSha256::new_from_slice(secret_key).expect("HMAC accepts 256-bit key");
         mac.update(payload.as_bytes());
         let expected_hmac: [u8; 32] = mac.finalize().into_bytes().into();
 
@@ -91,7 +92,7 @@ impl HashcashEngine {
         let mut nonce: u64 = 0;
         loop {
             let mut hasher = base_hasher.clone();
-            hasher.update(&nonce.to_be_bytes());
+            hasher.update(nonce.to_be_bytes());
             let hash = hasher.finalize();
 
             if Self::check_zero_bits(&hash, difficulty_bits) {
@@ -103,14 +104,10 @@ impl HashcashEngine {
 
     /// Server-side single-pass validator.
     /// Complexity: O(1) (~5 microseconds)
-    pub fn verify_solution(
-        ticket_hmac: &[u8; 32],
-        nonce: u64,
-        difficulty_bits: u32,
-    ) -> bool {
+    pub fn verify_solution(ticket_hmac: &[u8; 32], nonce: u64, difficulty_bits: u32) -> bool {
         let mut hasher = Sha256::new();
         hasher.update(ticket_hmac);
-        hasher.update(&nonce.to_be_bytes());
+        hasher.update(nonce.to_be_bytes());
         let hash = hasher.finalize();
 
         Self::check_zero_bits(&hash, difficulty_bits)

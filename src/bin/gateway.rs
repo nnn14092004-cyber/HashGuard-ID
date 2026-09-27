@@ -9,9 +9,7 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use hashguard_core::{
-    chain::HASH_OUTPUT_LENGTH, ChallengeTicket, HashGuardError, HashcashEngine,
-};
+use hashguard_core::{chain::HASH_OUTPUT_LENGTH, ChallengeTicket, HashGuardError, HashcashEngine};
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
@@ -24,7 +22,7 @@ use tower_http::cors::{Any, CorsLayer};
 type HmacSha256 = Hmac<Sha256>;
 
 pub const MAX_PAYLOAD_BYTES: usize = 2048; // Hard socket buffer limit (anti-exhaustion)
-pub const MAX_LOOKAHEAD_STEPS: usize = 5;  // Bounded packet loss desync tolerance: Delta <= 5
+pub const MAX_LOOKAHEAD_STEPS: usize = 5; // Bounded packet loss desync tolerance: Delta <= 5
 pub const NONCE_TTL_SECONDS: usize = 300; // 5-minute replay prevention lock
 
 const HKDF_CONTEXT_INFO: &[u8] = b"HashGuard-v1-Context-Enclosure-Key";
@@ -170,14 +168,22 @@ pub async fn enroll_handler(
     Json(payload): Json<EnrollRequestPayload>,
 ) -> Result<Json<EnrollResponsePayload>, (StatusCode, String)> {
     if payload.terminal_anchor.len() != 64 {
-        return Err((StatusCode::BAD_REQUEST, "Terminal anchor must be 32 bytes hex".into()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Terminal anchor must be 32 bytes hex".into(),
+        ));
     }
 
     let mut conn = state
         .redis_client
         .get_async_connection()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Redis connection error: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Redis connection error: {}", e),
+            )
+        })?;
 
     let anchor_key = format!("user:{}:anchor", payload.user_id);
     let step_key = format!("user:{}:step", payload.user_id);
@@ -189,7 +195,12 @@ pub async fn enroll_handler(
         .set(&step_key, payload.total_steps)
         .query_async::<_, ()>(&mut conn)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Redis pipeline write failure: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Redis pipeline write failure: {}", e),
+            )
+        })?;
 
     Ok(Json(EnrollResponsePayload {
         status: "ENROLLED_ATOMIC",
@@ -263,13 +274,21 @@ pub async fn verify_transaction_handler(
         .verify_ticket(current_time, &state.ephemeral_secret)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
-    if !HashcashEngine::verify_solution(&ticket.server_hmac, req.pow_nonce, ticket.difficulty_bits) {
-        return Err((StatusCode::FORBIDDEN, "Invalid Proof-of-Work solution".into()));
+    if !HashcashEngine::verify_solution(&ticket.server_hmac, req.pow_nonce, ticket.difficulty_bits)
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Invalid Proof-of-Work solution".into(),
+        ));
     }
 
     // 3. Cryptographic Context Verification: RFC 8785 JCS + RFC 5869 HKDF + RFC 2104 HMAC (Spec Item 1)
-    let canonical_bytes = serde_jcs::to_vec(&req.canonical_payload)
-        .map_err(|_| (StatusCode::BAD_REQUEST, "RFC 8785 Canonicalization failed".into()))?;
+    let canonical_bytes = serde_jcs::to_vec(&req.canonical_payload).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            "RFC 8785 Canonicalization failed".into(),
+        )
+    })?;
 
     let mut prehasher = Sha256::new();
     prehasher.update(&canonical_bytes);
@@ -297,7 +316,7 @@ pub async fn verify_transaction_handler(
     let mut cursor = token_bytes;
     for _ in 0..MAX_LOOKAHEAD_STEPS {
         let mut hasher = Sha256::new();
-        hasher.update(&cursor);
+        hasher.update(cursor);
         let digest: [u8; HASH_OUTPUT_LENGTH] = hasher.finalize().into();
         lookahead_hashes.push(hex::encode(digest));
         cursor = digest;
@@ -310,10 +329,14 @@ pub async fn verify_transaction_handler(
         req.nonce
     };
 
-    let next_anchor = req.canonical_payload.get("next_anchor")
+    let next_anchor = req
+        .canonical_payload
+        .get("next_anchor")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let next_steps = req.canonical_payload.get("next_total_steps")
+    let next_steps = req
+        .canonical_payload
+        .get("next_total_steps")
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
 
@@ -322,13 +345,18 @@ pub async fn verify_transaction_handler(
         .redis_client
         .get_async_connection()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Redis disconnected: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Redis disconnected: {}", e),
+            )
+        })?;
 
     let script = redis::Script::new(LUA_HARDENED_CAS_SCRIPT);
     let mut invocation = script.key(&req.user_id);
     invocation
         .arg(req.step_index)
-        .arg(&req.token.to_lowercase())
+        .arg(req.token.to_lowercase())
         .arg(&effective_nonce)
         .arg(NONCE_TTL_SECONDS)
         .arg(MAX_LOOKAHEAD_STEPS)
@@ -339,9 +367,8 @@ pub async fn verify_transaction_handler(
         invocation.arg(candidate);
     }
 
-    let result: Result<(usize, String, String), redis::RedisError> = invocation
-        .invoke_async(&mut conn)
-        .await;
+    let result: Result<(usize, String, String), redis::RedisError> =
+        invocation.invoke_async(&mut conn).await;
 
     match result {
         Ok((committed_step, _, status_msg)) => {
@@ -365,7 +392,10 @@ pub async fn verify_transaction_handler(
             } else if err_str.contains("ERR_USER_NOT_FOUND") {
                 Err((StatusCode::NOT_FOUND, "ERR_USER_NOT_FOUND".into()))
             } else {
-                Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Redis CAS failure: {}", err)))
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Redis CAS failure: {}", err),
+                ))
             }
         }
     }
@@ -392,11 +422,14 @@ async fn main() {
     getrandom::getrandom(&mut ephemeral_secret).expect("CSPRNG failure");
 
     let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
-    let redis_client = redis::Client::open(redis_url.clone())
-        .expect("Failed to initialize Redis client");
+    let redis_client =
+        redis::Client::open(redis_url.clone()).expect("Failed to initialize Redis client");
 
     match redis_client.get_async_connection().await {
-        Ok(_) => println!("[+] Connected to Distributed Redis State Engine at: {}", redis_url),
+        Ok(_) => println!(
+            "[+] Connected to Distributed Redis State Engine at: {}",
+            redis_url
+        ),
         Err(e) => {
             eprintln!("[-] Fatal: Cannot connect to Redis at {}: {}", redis_url, e);
             std::process::exit(1);
